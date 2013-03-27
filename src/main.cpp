@@ -35,12 +35,10 @@ int main(int argc, char **argv)
     computeAccel();
 
 
+    FileManager fileManager(procID, nLocalResAtoms, nProc);
+    fileManager.loadConfiguration(&cfg);
+
     cpu1 = MPI_Wtime();
-
-    stringstream outName;
-    ofstream myfile;
-    string path = "../md/DATA/states/";
-
 
     if(procID==0){
         cout << "-----run integrator-----" << endl;
@@ -50,25 +48,30 @@ int main(int argc, char **argv)
             cout << state << endl;
         }
 
-        if(state > 1){
-            singleStep();
-        }
 
-        outName << path <<"p" <<procID << "s" << state << ".xyz";
-        myfile.open (outName.str().c_str());
+//        for(uint i=0; i< aPosition.n_rows; i++){
+//            aPosition.row(i) -= origo.t();
+//        }
 
-        myfile << nLocalResAtoms << endl;
-        myfile <<"Argon atoms" << endl;
+        fileManager.writeAtomProperties(state,aPosition,aVelocity);
 
-        for(int i =0 ; i <nLocalResAtoms; i++){
-            myfile << "Ar" <<join_rows(aPosition.row(i), aVelocity.row(i));
-        }
+//        for(uint i=0; i< aPosition.n_rows; i++){
+//            aPosition.row(i) += origo.t();
+//        }
 
-        outName.str( std::string() );
-        outName.clear();
-        myfile.close();
+
+
+        singleStep();
+
+
+
+
+
     }
 
+//    if(procID==0){
+//        fileManager.readDataFromFile();
+//    }
     cpu = MPI_Wtime() - cpu1;
     if (procID == 0) printf("CPU & COMT = %le %le\n",cpu,comt);
     MPI_Finalize();
@@ -654,6 +657,7 @@ void initilizeParameters(){
 
     subsysSize  = zeros<vec>(3,1);  //Lx,Ly,Lz
     cellSize    = zeros<vec>(3,1);  //rcx,rcy,rcz
+    origo       = zeros<vec>(3,1);
     nLocalCells = zeros<ivec>(3,1);
 
     aPosition = zeros<mat>(NEMAX,3);
@@ -672,6 +676,7 @@ void initilizeParameters(){
     for (int i=0; i<3; i++) {
         nLocalCells(i) = int(subsysSize(i) / rCut);
         cellSize(i)    = subsysSize(i) / nLocalCells(i);
+        origo(i)       = (double)IDVec(i) * subsysSize(i);
     }
 
 
@@ -691,6 +696,7 @@ void initilizeParameters(){
         cout << "Subsystem size: "  << subsysSize.t();
         cout << "Number of cells: " << nLocalCells.t();
         cout << "cellSize:        " << cellSize.t();
+        cout << "origoshift       " << origo.t();
     }
 }
 
@@ -709,14 +715,19 @@ void loadConfiguration(){
         MPI_Barrier(MPI_COMM_WORLD);
     }
 
-    N = cfg.lookup("variables.N");
-    density = cfg.lookup("variables.density");
-    initTemp = cfg.lookup("variables.initTemp");
-    initTemp/=119.74;
-    dt = cfg.lookup("variables.dt");
-    stepLimit = cfg.lookup("variables.stepLimit");
-    stepAvg = cfg.lookup("variables.stepAvg");
-    rCut = cfg.lookup("variables.rCut");
+    N = cfg.lookup("systemSettings.Nc");
+    density = cfg.lookup("systemSettings.density");
+    rCut = cfg.lookup("systemSettings.rCut");
+    initTemp = cfg.lookup("systemSettings.initTemp");
+    T_0 =cfg.lookup("conversionFactors.T_0");
+    dt = cfg.lookup("statisticsSettings.dt");
+    stepLimit = cfg.lookup("statisticsSettings.numStates");
+    stepAvg = cfg.lookup("statisticsSettings.stepAvg");
+
+    cfg.lookupValue("fileManagerSettings.statesDir",path);
+
+    initTemp/=T_0;
+
 }
 
 
