@@ -12,10 +12,10 @@ FileManager::FileManager(const int &procID, const int &nLocalResAtoms, const int
 Name:           writeToFile
 Description:    Writes the states to files
 */
-void FileManager::writeAtomProperties(const int &state, Atom** atoms){
+void FileManager::writeAtomProperties(const int &state, const vec &origo, Atom** atoms){
 
     outName << statesDir << "state" << state << ".xyz";
-    myfile.open(outName.str().c_str());
+    myfile.open(outName.str().c_str(), ios::app);
 
     if(procID==0){
         myfile << nLocalResAtoms*nProc << endl;
@@ -28,7 +28,7 @@ void FileManager::writeAtomProperties(const int &state, Atom** atoms){
         if(procID==node){
             for(int i=0;  i < nLocalResAtoms; i++){
                 atoms[i]->aType="Ar";
-                myfile << atoms[i]->aType <<"  "<<join_rows(atoms[i]->aPosition, atoms[i]->aVelocity);
+                myfile << atoms[i]->aType <<"  "<<join_rows(atoms[i]->aPosition-origo.t(), atoms[i]->aVelocity);
             }
         }
         MPI_Barrier(MPI_COMM_WORLD);

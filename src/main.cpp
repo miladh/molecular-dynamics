@@ -6,6 +6,7 @@
 
 #include <src/system/system.h>
 #include <src/atom/atom.h>
+#include <src/generator/generator.h>
 
 #pragma GCC diagnostic ignored "-Wunused-parameter"
 #include <mpi.h>
@@ -16,7 +17,7 @@
 int main(int argc, char* argv[])
 {
 
-    /************************************************************
+    /********************************************************************
     Initializing
     */
     int procID, nProc;
@@ -35,8 +36,10 @@ int main(int argc, char* argv[])
         }
         MPI_Barrier(MPI_COMM_WORLD);
     }
-    /***************************************************************/
 
+    int nLocalResAtoms;
+    string velocityDist= cfg.lookup("initialVelocitySetting.velocityDist");
+    /***********************************************************************/
 
 
     Atom **ArAtoms= new Atom*[NEMAX];
@@ -44,11 +47,15 @@ int main(int argc, char* argv[])
         ArAtoms[i] = new Atom(&cfg);
     }
 
+    Generator ArGenerator(procID, nProc);
+    ArGenerator.loadConfiguration(&cfg);
+    ArGenerator.fccLatticeGenerator(ArAtoms);
+    ArGenerator.setVelocity(ArAtoms,velocityDist);
+    nLocalResAtoms = ArGenerator.getNLocalResAtoms();
 
-    System Ar(procID, nProc, ArAtoms);
+    System Ar(procID, nProc,  nLocalResAtoms ,ArAtoms);
     Ar.loadConfiguration(&cfg);
     Ar.MDrun();
-
 
     MPI_Finalize();
 }

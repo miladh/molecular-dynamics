@@ -20,7 +20,7 @@ class FileManager
 public:
     FileManager(const int &procID, const int &nLocalResAtoms, const int &nProc);
     void loadConfiguration(Config* cfg);
-    void writeAtomProperties(const int &state, Atom **atoms);
+    void writeAtomProperties(const int &state, const vec &origo, Atom **atoms);
     void readDataFromFile();
 private:
     int procID, nLocalResAtoms, nProc, stepLimit;

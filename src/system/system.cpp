@@ -1,8 +1,9 @@
 #include <src/system/system.h>
 
-System::System(const int &procID, const int &nProc, Atom** atoms):
+System::System(const int &procID, const int &nProc, const int &nLocalResAtoms,Atom** atoms):
     procID(procID),
     nProc(nProc),
+    nLocalResAtoms(nLocalResAtoms),
     atoms(atoms)
 {
 }
@@ -13,35 +14,15 @@ System::System(const int &procID, const int &nProc, Atom** atoms):
  ***************************************************************/
 void System::MDrun()
 {
-
-    double cpu1;
-    // Set number of processors in x,y,z direction
-    procVec = zeros<ivec>(3,1);
-    procVec(2) = 1;
-    procVec(1) = 1;
-    procVec(0) = 1;
-
-    if(procVec(0)*procVec(1)*procVec(2)!=nProc){
-        cerr << "Number of processors doesn't match!" << endl;
-        exit(1);
-    }
-
-    // Vector index of this processor
-    IDVec = zeros<ivec>(3,1);
-    IDVec(0) = procID / (procVec(1) * procVec(2));
-    IDVec(1) = (procID / procVec(2)) % procVec(1);
-    IDVec(2) = procID % procVec(2);
-
     initilizeParameters();
     setTopology();
-    initializeConfiguration();
     atomCopy();
     computeAccel();
-
 
     FileManager fileManager(procID, nLocalResAtoms, nProc);
     fileManager.loadConfiguration(cfg);
 
+    double cpu1;
     cpu1 = MPI_Wtime();
 
     if(procID==0){
@@ -51,102 +32,14 @@ void System::MDrun()
         if(procID==0){
             cout << state << endl;
         }
-
-
-        for(int i=0; i< nLocalResAtoms; i++){
-            atoms[i]->aPosition -= origo.t();
-        }
-
-        fileManager.writeAtomProperties(state,atoms);
-
-        for(int i=0; i< nLocalResAtoms; i++){
-            atoms[i]->aPosition += origo.t();
-        }
-
+        fileManager.writeAtomProperties(state,origo,atoms);
         singleStep();
-
     }
+
     cpu = MPI_Wtime() - cpu1;
     if (procID == 0) printf("CPU & COMT = %le %le\n",cpu,comt);
 
 }
-
-
-
-
-/***************************************************************
- * Name:
- * Description:
- ***************************************************************/
-void System::initializeConfiguration()
-{
-    vec dR = zeros<vec>(3,1);
-    vec dr = zeros<vec>(3,1);
-    vec localSumVelocities = zeros<vec>(3,1);
-    vec sumVelocities = zeros<vec>(3,1);
-    mat origAtom= zeros<mat>(4,3);
-
-    // FCC atoms in the original unit cell
-    origAtom << 0.0 << 0.0 << 0.0 << endr
-             << 0.0 << 0.5 << 0.5 << endr
-             << 0.5 << 0.0 << 0.5 << endr
-             << 0.5 << 0.5 << 0.0 << endr;
-
-    // Set up a face-centered cubic (fcc) lattice
-    for (int i=0; i<3; i++){
-        dr[i] = (double)subsysSize(i)/systemSize(i);
-    }
-    int aNum = 0;
-    for (int nZ=0; nZ < systemSize(2); nZ++) {
-        dR[2] = nZ*dr[2];
-        for (int nY=0; nY<systemSize(1); nY++) {
-            dR[1] = nY*dr[1];
-            for (int nX=0; nX<systemSize(0); nX++) {
-                dR[0] = nX*dr[0];
-                for (int j=0; j < 4; j++) {
-                    for (int i=0; i < 3; i++){
-                        atoms[aNum]->aPosition(i) = dR[i] + dr[i]*origAtom(j,i);
-                    }
-                    aNum++;
-                }
-            }
-        }
-    }
-
-    nLocalResAtoms = aNum;
-    // Total # of atoms summed over processors
-    MPI_Allreduce(&nLocalResAtoms,&nAtoms,1,MPI_INT,MPI_SUM,MPI_COMM_WORLD);
-
-
-    // Generate random velocities
-    double std = sqrt(initTemp);
-    for(int i = 0; i < nLocalResAtoms; i++){
-        for(int j=0; j < 3 ; j++){
-            atoms[i]->aVelocity(j) = randn()*std;
-            localSumVelocities(j) +=atoms[i]->aVelocity(j);
-        }
-    }
-
-    MPI_Allreduce(&localSumVelocities[0],&sumVelocities[0],3,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
-
-
-    // Make the total momentum zero
-    sumVelocities/=nAtoms;
-    for(int i=0; i < nLocalResAtoms; i++){
-        for(int j=0; j < 3; j++){
-            atoms[i]->aVelocity(j) -= sumVelocities(j);
-        }
-    }
-
-    //Write
-    if(procID==0){
-        cout << "------Initilize configuration-------" << endl;
-        cout << "Number of Local atoms: "<< nLocalResAtoms << endl;
-        cout << "Number of atoms:       "<< nAtoms << endl;
-    }
-
-}
-
 
 /***************************************************************
  * Name:
@@ -207,15 +100,28 @@ void System::setTopology(){
  ***************************************************************/
 void System::initilizeParameters(){
 
-    systemSize = zeros<ivec>(3,1);
-    systemSize << N << N << N ;     //Px, Py, Pz
-
+    procVec     = zeros<ivec>(3,1);
+    IDVec       = zeros<ivec>(3,1);
+    systemSize  = zeros<ivec>(3,1); //Px, Py, Pz
     subsysSize  = zeros<vec>(3,1);  //Lx,Ly,Lz
     cellSize    = zeros<vec>(3,1);  //rcx,rcy,rcz
     origo       = zeros<vec>(3,1);
     nLocalCells = zeros<ivec>(3,1);
-
     boundaryAtomList = zeros<imat>(6,NBMAX);
+
+
+    // Set system size and number of processors in x,y,z direction
+    systemSize << Nc << Nc << Nc ;
+    procVec << nX << nY << nZ;
+    if(procVec(0)*procVec(1)*procVec(2)!=nProc){
+        cerr << "Number of processors doesn't match!" << endl;
+        exit(1);
+    }
+
+    // Vector index of this processor
+    IDVec(0) = procID / (procVec(1) * procVec(2));
+    IDVec(1) = (procID / procVec(2)) % procVec(1);
+    IDVec(2) = procID % procVec(2);
 
 
     // Compute subsystem size (Lx,Ly,Lz)
@@ -691,25 +597,23 @@ int System::atomIsBoundary(rowvec r, int neighborID)
     }
 }
 
-
-
 /***************************************************************
  * Name:            loadConfiguration
  * Description:     Load system variables
  ***************************************************************/
 void System::loadConfiguration(Config* cfg){
     this->cfg=cfg;
-    N = cfg->lookup("systemSettings.Nc");
+    Nc = cfg->lookup("systemSettings.Nc");
+    nX = cfg->lookup("systemSettings.nX");
+    nY = cfg->lookup("systemSettings.nY");
+    nZ = cfg->lookup("systemSettings.nZ");
     density = cfg->lookup("systemSettings.density");
     rCut = cfg->lookup("systemSettings.rCut");
-    initTemp = cfg->lookup("systemSettings.initTemp");
     T_0 =cfg->lookup("conversionFactors.T_0");
     dt = cfg->lookup("statisticsSettings.dt");
     stepLimit = cfg->lookup("statisticsSettings.numStates");
     stepAvg = cfg->lookup("statisticsSettings.stepAvg");
     cfg->lookupValue("fileManagerSettings.statesDir",path);
-
-    initTemp/=T_0;
 
 }
 

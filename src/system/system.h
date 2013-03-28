@@ -24,13 +24,12 @@ using namespace libconfig;
 class System
 {
 public:
-    System(const int &procID, const int &nProc, Atom **atoms);
+    System(const int &procID, const int &nProc, const int &nLocalResAtoms, Atom **atoms);
 
     void MDrun();
     void initilizeParameters();
     void loadConfiguration(Config* cfg);
     void setTopology();
-    void initializeConfiguration();
     void atomCopy();
     void atomMove();
     void singleStep();
@@ -39,7 +38,7 @@ public:
     int atomDidMove(rowvec r, int neighborID);
     int atomIsBoundary(rowvec r, int neighborID);
 
-    int procID, nProc, N;
+    int procID, nProc, Nc;
     int nAtoms,nLocalResAtoms;
     int nBounAtoms;
     double rCut;
@@ -65,13 +64,14 @@ public:
 
     ivec systemSize;   /* Number of unit cells per processor */
     double density;     /* Number density of atoms (in reduced unit) */
-    double initTemp;    /* Starting temperature (in reduced unit) */
     double dt;      /* Size of a time step (in reduced unit) */
     int stepLimit;      /* Number of time steps to be simulated */
     int stepAvg;        /* Reporting interval for statistical data */
 
     double T_0;
     string path;
+
+    int nX,nY,nZ;
 
 };
 
