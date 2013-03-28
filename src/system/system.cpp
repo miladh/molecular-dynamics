@@ -1,9 +1,11 @@
 #include <src/system/system.h>
+#include <src/force/lj.h>
 
-System::System(const int &procID, const int &nProc, const int &nLocalResAtoms,Atom** atoms):
+System::System(const int &procID, const int &nProc, const int &nLocalResAtoms, const int &nAtoms,Atom** atoms):
     procID(procID),
     nProc(nProc),
     nLocalResAtoms(nLocalResAtoms),
+    nAtoms(nAtoms),
     atoms(atoms)
 {
 }
@@ -28,18 +30,78 @@ void System::MDrun()
     if(procID==0){
         cout << "-----run integrator-----" << endl;
     }
-    for (int state=1; state <= stepLimit; state++) {
+    for (int i=1; i <= stepLimit; i++) {
+        state = i-1;
         if(procID==0){
-            cout << state << endl;
+            cout << i << endl;
         }
-        fileManager.writeAtomProperties(state,origo,atoms);
+
+        evaluateSystemProperties();
+        fileManager.writeAtomProperties(i,origo,atoms);
         singleStep();
+
+        for(Modifier* modifier: modifiers){
+            modifier->apply();
+        }
     }
 
+
     cpu = MPI_Wtime() - cpu1;
-    if (procID == 0) printf("CPU & COMT = %le %le\n",cpu,comt);
+    if (procID == 0){
+        fileManager.writeSystemProperties(stepLimit,time,kinEnergy,potEnergy,totEnergy,temperature,pressure);
+        printf("CPU & COMT = %le %le\n",cpu,comt);
+    }
+}
+
+/************************************************************
+Name:           computeDynamics
+Description:    Computes the dynamics of the system.
+*/
+double System::getTemperature(){
+    return temperature[state];
+}
+
+
+
+/************************************************************
+Name:           AddModifiers
+Description:
+*/
+void System::addModifiers(Modifier* modifier){
+    modifiers.push_back(modifier);
 
 }
+
+/***************************************************************
+ * Name:
+ * Description:
+ ***************************************************************/
+void System::evaluateSystemProperties()
+{
+    double localKinEnergy = 0.0;
+    double localPotEnergy = 0.0;
+    double localPressure  = 0.0;
+
+    for (int i=0; i<nLocalResAtoms; i++) {
+        localKinEnergy  += dot(atoms[i]->aVelocity,atoms[i]->aVelocity);
+        localPotEnergy  += atoms[i]->aPotential;
+        localPressure   += atoms[i]->localPressure;
+    }
+
+    localKinEnergy *= 0.5;
+    MPI_Allreduce(&localKinEnergy,&kinEnergy[state],1,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
+    MPI_Allreduce(&localPotEnergy,&potEnergy[state],1,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
+    MPI_Allreduce(&localPressure, &pressure[state],1,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
+
+    time[state] = state*dt;
+    kinEnergy[state]  /= nAtoms;
+    potEnergy[state]  /= nAtoms;
+    totEnergy[state]   = kinEnergy[state] + potEnergy[state];
+    temperature[state] = kinEnergy[state]*2.0/3.0;
+    pressure[state]    += density*temperature[state];
+    //    pressure[state]   *= 1/(6*volume);
+}
+
 
 /***************************************************************
  * Name:
@@ -109,6 +171,13 @@ void System::initilizeParameters(){
     nLocalCells = zeros<ivec>(3,1);
     boundaryAtomList = zeros<imat>(6,NBMAX);
 
+    time = zeros<vec>(stepLimit,1);
+    kinEnergy   = zeros<vec>(stepLimit,1);
+    potEnergy   = zeros<vec>(stepLimit,1);
+    totEnergy   = zeros<vec>(stepLimit,1);
+    temperature = zeros<vec>(stepLimit,1);
+    pressure    = zeros<vec>(stepLimit,1);
+
 
     // Set system size and number of processors in x,y,z direction
     systemSize << Nc << Nc << Nc ;
@@ -136,16 +205,6 @@ void System::initilizeParameters(){
         origo(i)       = (double)IDVec(i) * subsysSize(i);
     }
 
-
-    // Constants for potential truncation
-    double rCut2,rCuti2,rCuti6,r1;
-    rCut2 = rCut*rCut;
-    rCuti2 = 1.0/rCut2;
-    rCuti6 = rCuti2*rCuti2*rCuti2;
-    r1=sqrt(rCut2);
-    Uc  =  4.0  * rCuti6 *(rCuti6 - 1.0);
-    dUc = -48.0 * rCuti6 *(rCuti6 - 0.5) / r1;
-
     //Write
     if(procID==0){
         cout << "------Initilizing Parameters--------" << endl;
@@ -166,20 +225,19 @@ void System::computeAccel()
     ivec nInteractionCells = zeros<ivec>(3,1);
     ivec cellVec = zeros<ivec>(3,1);
     ivec neigCellVec = zeros<ivec>(3,1);
-    vec dr = zeros<vec>(3,1);
+
     int Lyz, Lxyz;
     int atomI, atomJ;
-
     int neigCell;
-    int bintra;
-    double dr2,dri2,dri6,dr1,rCut2,fcVal,f,vVal,lpe;
+    int atomIsResident, pairIsNotEvaluated;
 
     // Reset the potential & forces
-    lpe = 0.0;
     for (int i=0; i < nLocalResAtoms; i++){
         for (int j=0; j<3; j++){
             atoms[i]->aAcceleration(j) = 0.0;
         }
+        atoms[i]->aPotential = 0.0;
+        atoms[i]->localPressure = 0.0;
     }
 
     // Make a linked-cell list, lscl
@@ -210,10 +268,7 @@ void System::computeAccel()
     } // Endfor atom i
 
 
-
     // Calculate pair interaction-------------------------------
-    rCut2 = rCut*rCut;
-
     // Scan local cells
     for (cellVec(0) = 1; cellVec(0) <= nLocalCells(0); (cellVec(0))++ ){
         for (cellVec(1) = 1; cellVec(1) <= nLocalCells(1); (cellVec(1))++ ){
@@ -249,35 +304,10 @@ void System::computeAccel()
                                     // No calculation with itself
                                     if (atomJ != atomI) {
                                         // Check if resident atom
-                                        bintra = (atomJ < nLocalResAtoms);
+                                        atomIsResident = (atomJ < nLocalResAtoms);
+                                        pairIsNotEvaluated = (atomI < atomJ);
 
-                                        // Pair vector dr
-                                        dr2=0.0;
-                                        for (int a=0; a<3; a++) {
-                                            dr(a) = atoms[atomI]->aPosition(a) - atoms[atomJ]->aPosition(a);
-                                            dr2 += dr(a)*dr(a);
-                                        }
-
-                                        /* Calculate potential & forces for intranode pairs (i < j)
-                                           & all the internode pairs if rij < RCUT; note that for
-                                           any copied atom, i < j */
-                                        if (atomI < atomJ && dr2 < rCut2) {
-                                            dri2  = 1.0/dr2; dri6 = dri2*dri2*dri2; dr1 = sqrt(dr2);
-                                            fcVal = 48.0*dri2*dri6*(dri6 - 0.5) + dUc / dr1;
-                                            vVal  = 4.0*dri6*(dri6 - 1.0) - Uc - dUc*(dr1 - rCut);
-                                            if (bintra){
-                                                lpe += vVal;
-                                            } else{
-                                                lpe += 0.5*vVal;
-                                            }
-                                            for (int a=0; a<3; a++) {
-                                                f = fcVal*dr(a);
-                                                atoms[atomI]->aAcceleration(a)  += f;
-                                                if (bintra){
-                                                    atoms[atomJ]->aAcceleration(a)  -= f;
-                                                }
-                                            }
-                                        }
+                                        force->calculateAndApplyForce(atoms[atomI], atoms[atomJ],atomIsResident,pairIsNotEvaluated);
                                     } // Endif not self interaction
 
                                     atomJ = atomList[atomJ];
@@ -290,13 +320,9 @@ void System::computeAccel()
                     }
                 } // Endfor neighbor cells, c1
 
-            } // Endfor central cell, c
+            }
         }
-    }
-
-
-    // Global potential energy
-    MPI_Allreduce(&lpe,&potEnergy,1,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
+    }// Endfor central cell, c
 }
 
 
@@ -596,6 +622,7 @@ int System::atomIsBoundary(rowvec r, int neighborID)
         return subsysSize(i) - rCut < r(i);
     }
 }
+
 
 /***************************************************************
  * Name:            loadConfiguration

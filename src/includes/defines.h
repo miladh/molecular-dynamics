@@ -20,4 +20,14 @@ EMPTY: Signifies the end of a linked list.
 #define MOVED_OUT -1.0e10
 #define EMPTY -1
 
+
+
+enum force {
+   noInteraction, lennardJones
+};
+
+enum modifier {
+    noModifier, Andersen, Berendsen
+};
+
 #endif // DEFINES_H

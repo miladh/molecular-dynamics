@@ -24,6 +24,7 @@ public:
     void fccLatticeGenerator(Atom **atoms);
     void setVelocity(Atom **atoms, string distribution);
     int getNLocalResAtoms();
+    int getNAtoms();
 
 private:
     int procID,nProc;

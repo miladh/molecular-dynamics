@@ -73,6 +73,15 @@ int Generator::getNLocalResAtoms()
     return nLocalResAtoms;
 }
 
+/************************************************************
+Name:           fcc_lattice_creator
+Description:    Creates a FCC lattice
+*/
+int Generator::getNAtoms()
+{
+    return nAtoms;
+}
+
 
 /************************************************************
 Name:           setVelocity

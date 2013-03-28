@@ -1,6 +1,8 @@
 #ifndef SYSTEM_H
 #define SYSTEM_H
 
+class Modifier;
+
 #include <iostream>
 #include <stdio.h>
 #include <math.h>
@@ -10,6 +12,8 @@
 #include <src/atom/atom.h>
 #include <src/includes/defines.h>
 #include <src/fileManager/filemanager.h>
+#include <src/force/twobodyforce.h>
+#include "src/modifier/modifier.h"
 
 #pragma GCC diagnostic ignored "-Wunused-parameter"
 #include <mpi.h>
@@ -24,7 +28,7 @@ using namespace libconfig;
 class System
 {
 public:
-    System(const int &procID, const int &nProc, const int &nLocalResAtoms, Atom **atoms);
+    System(const int &procID, const int &nProc, const int &nLocalResAtoms, const int &nAtoms, Atom **atoms);
 
     void MDrun();
     void initilizeParameters();
@@ -37,14 +41,16 @@ public:
     void computeAccel() ;
     int atomDidMove(rowvec r, int neighborID);
     int atomIsBoundary(rowvec r, int neighborID);
+    void evaluateSystemProperties();
+    double getTemperature();
+    void addModifiers(Modifier* modifier);
 
     int procID, nProc, Nc;
-    int nAtoms,nLocalResAtoms;
+    int nLocalResAtoms,nAtoms;
     int nBounAtoms;
     double rCut;
-    double Uc, dUc;    /* Potential cut-off parameters */
     double cpu,comt;
-    double kinEnergy,potEnergy,totEnergy,temperature;
+    vec time,kinEnergy,potEnergy,totEnergy,temperature,pressure;
 
     int cellList[NCLMAX], atomList[NEMAX];
     double dbuf[NDBUF],dbufr[NDBUF];
@@ -72,6 +78,13 @@ public:
     string path;
 
     int nX,nY,nZ;
+
+    int state;
+
+    TwoBodyForce* force;
+     vector <Modifier*> modifiers;
+
+
 
 };
 

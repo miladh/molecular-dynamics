@@ -15,7 +15,7 @@ Description:    Writes the states to files
 void FileManager::writeAtomProperties(const int &state, const vec &origo, Atom** atoms){
 
     outName << statesDir << "state" << state << ".xyz";
-    myfile.open(outName.str().c_str(), ios::app);
+    myfile.open(outName.str().c_str());
 
     if(procID==0){
         myfile << nLocalResAtoms*nProc << endl;
@@ -39,6 +39,31 @@ void FileManager::writeAtomProperties(const int &state, const vec &origo, Atom**
     myfile.close();
 
 }
+
+
+/************************************************************
+Name:
+Description:
+*/
+void FileManager::writeSystemProperties(int numStates, const vec &t,
+                                        const vec &Ek, const vec &Ep, vec const &Etot, const vec &T,const vec &P){
+
+    outName << statisticsDir << "/statistics.txt";
+    myfile.open (outName.str().c_str());
+    myfile << "Time  "  <<"Kinetic " << "  Potential  "
+           <<"  Total Energy  "<<"  Temperature  "<<"  Pressure  "<<endl;
+
+    for(int state=0; state<numStates; state++){
+        myfile << t_0*t[state] <<"      "<< epsilon*Ek[state] <<"  "<< epsilon*Ep[state]
+           << "     "<< epsilon*Etot[state]<< "     "<<T_0*T[state]
+           << "     "<< pressureFactor*epsilon/pow(sigma,3)*P[state] << endl;
+    }
+    myfile.close();
+}
+
+
+
+
 /************************************************************
 Name:
 Description:
