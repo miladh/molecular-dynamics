@@ -6,6 +6,8 @@
 #include <math.h>
 #include <armadillo>
 #include <libconfig.h++>
+
+#include <src/atom/atom.h>
 #include <src/includes/defines.h>
 #include <src/fileManager/filemanager.h>
 
@@ -22,7 +24,7 @@ using namespace libconfig;
 class System
 {
 public:
-    System();
+    System(const int &procID, const int &nProc, Atom **atoms);
 
     void MDrun();
     void initilizeParameters();
@@ -58,6 +60,8 @@ public:
 
     Config* cfg;
     MPI_Status status;
+
+    Atom** atoms;
 
     ivec systemSize;   /* Number of unit cells per processor */
     double density;     /* Number density of atoms (in reduced unit) */

@@ -4,6 +4,8 @@
 #include <libconfig.h++>
 #include <armadillo>
 #include <iostream>
+
+#include <src/atom/atom.h>
 #pragma GCC diagnostic ignored "-Wunused-parameter"
 #include <mpi.h>
 // Enable warnings again
@@ -18,7 +20,7 @@ class FileManager
 public:
     FileManager(const int &procID, const int &nLocalResAtoms, const int &nProc);
     void loadConfiguration(Config* cfg);
-    void writeAtomProperties(const int &state, const mat &aPosition, const mat &aVelocity);
+    void writeAtomProperties(const int &state, Atom **atoms);
     void readDataFromFile();
 private:
     int procID, nLocalResAtoms, nProc, stepLimit;
