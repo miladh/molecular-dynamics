@@ -23,16 +23,21 @@ void MDApp::runMDApp()
         ArAtoms[i] = new Atom(cfg);
     }
 
+
+    if(!loadState){
+        ofstream myfile;
+        outName << stateDir << "state10.xyz";
+        myfile.open(outName.str().c_str());
+
+    }else{
     Generator ArGenerator(procID, nProc);
     ArGenerator.loadConfiguration(cfg);
     ArGenerator.fccLatticeGenerator(ArAtoms);
-
-    setInitVelocityDistribution();
-    ArGenerator.setVelocity(ArAtoms,velocityDist);
+    ArGenerator.setVelocity(ArAtoms);
 
     nLocalResAtoms = ArGenerator.getNLocalResAtoms();
     nAtoms = ArGenerator.getNAtoms();
-
+}
     TwoBodyForce* force = setForceType();
     force->setParameters(cfg);
 
@@ -41,23 +46,6 @@ void MDApp::runMDApp()
     setModifierType(&Ar);
     Ar.loadConfiguration(cfg);
     Ar.simulateSystem();
-}
-
-
-/************************************************************
-Name:
-Description:
-*/
-void MDApp::setInitVelocityDistribution()
-{
-    switch (initVelocityDist) {
-    case uniform:
-        velocityDist = "uniform";
-        break;
-    case normal:
-        velocityDist = "normal";
-        break;
-    }
 }
 
 
@@ -123,7 +111,8 @@ void MDApp::loadConfiguration(Config* cfg){
     targetTemperature=cfg->lookup("ModifierSettings.targetTemperature");
     modifierType= cfg->lookup("ModifierSettings.modifierType");
     forceType= cfg->lookup("forceSettings.forceType");
-    initVelocityDist= cfg->lookup("initialVelocitySetting.initVelocityDist");
+    loadState = cfg->lookup("initialStateSettings.loadState");
+    cfg->lookupValue("fileManagerSettings.statesDir",stateDir);
 }
 
 

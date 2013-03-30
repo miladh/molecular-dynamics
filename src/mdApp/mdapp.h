@@ -29,14 +29,15 @@ public:
 
 private:
     Config* cfg;
-    string velocityDist;
+    string stateDir;
+    stringstream outName;
+    int loadState;
     int procID, nProc;
     int nLocalResAtoms, nAtoms;
-    int modifierType, forceType, initVelocityDist;
+    int modifierType, forceType;
     double tau,targetTemperature, T_0;
 
     void setModifierType(System *system);
-    void setInitVelocityDistribution();
     TwoBodyForce* setForceType();
 };
 

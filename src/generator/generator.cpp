@@ -68,14 +68,15 @@ void Generator::fccLatticeGenerator(Atom **atoms)
 Name:           setVelocity
 Description:    Sets initial velocity
 */
-void Generator::setVelocity(Atom **atoms, string distribution)
+void Generator::setVelocity(Atom **atoms)
 {
+    setInitVelocityDistribution();
     vec localSumVelocities = zeros<vec>(3,1);
     vec sumVelocities = zeros<vec>(3,1);
     idum = idum - procID- time(NULL);
     srand(-idum);
 
-    if(distribution =="uniform"){
+    if(velocityDist =="uniform"){
         double v=2.0;
         for(int i = 0; i < nLocalResAtoms; i++){
             for(int j=0; j < 3 ; j++){
@@ -83,7 +84,7 @@ void Generator::setVelocity(Atom **atoms, string distribution)
                 localSumVelocities(j) +=atoms[i]->aVelocity(j);
             }
         }
-    }else if(distribution=="normal"){
+    }else if(velocityDist=="normal"){
         double std =sqrt(Temperator/T_0);
         for(int i = 0; i < nLocalResAtoms; i++){
             for(int j=0; j < 3 ; j++){
@@ -105,8 +106,8 @@ void Generator::setVelocity(Atom **atoms, string distribution)
 }
 
 /************************************************************
-Name:           fcc_lattice_creator
-Description:    Creates a FCC lattice
+Name:
+Description:
 */
 int Generator::getNLocalResAtoms()
 {
@@ -114,12 +115,30 @@ int Generator::getNLocalResAtoms()
 }
 
 /************************************************************
-Name:           fcc_lattice_creator
-Description:    Creates a FCC lattice
+Name:
+Description:
 */
 int Generator::getNAtoms()
 {
     return nAtoms;
+}
+
+
+
+/************************************************************
+Name:
+Description:
+*/
+void Generator::setInitVelocityDistribution()
+{
+    switch (initVelocityDist) {
+    case uniform:
+        velocityDist = "uniform";
+        break;
+    case normal:
+        velocityDist = "normal";
+        break;
+    }
 }
 
 /************************************************************
@@ -132,4 +151,5 @@ void Generator::loadConfiguration(Config* cfg){
     T_0=cfg->lookup("conversionFactors.T_0");
     density = cfg->lookup("systemSettings.density");
     idum = cfg->lookup("initialVelocitySetting.idum");
+    initVelocityDist= cfg->lookup("initialVelocitySetting.initVelocityDist");
 }

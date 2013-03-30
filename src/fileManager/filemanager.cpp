@@ -14,7 +14,7 @@ Description:    Writes the states to files
 */
 void FileManager::writeAtomProperties(const int &state, const vec &origo, Atom** atoms){
 
-    outName << statesDir << "state" << state << ".xyz";
+    outName << statesDir << "state" << state << ".bin";
     myfile.open(outName.str().c_str());
 
     if(procID==0){
@@ -48,8 +48,8 @@ Description:
 void FileManager::writeSystemProperties(int numStates, const vec &t,
                                         const vec &Ek, const vec &Ep, vec const &Etot, const vec &T,const vec &P, const vec &D){
 
-    outName << statisticsDir << "/statistics.txt";
-    myfile.open (outName.str().c_str());
+    outName << statisticsDir << "/statistics.bin";
+    myfile.open (outName.str().c_str(),ios::binary);
     myfile << "Time  "  <<"Kinetic " << "  Potential  "
            <<"  Total Energy  "<<"  Temperature  "<<"  Pressure  "<<"  Displacement  "<<endl;
 

@@ -4,6 +4,7 @@
 #include <armadillo>
 #include <iostream>
 #include <libconfig.h++>
+#include <src/includes/defines.h>
 #include "src/atom/atom.h"
 
 #pragma GCC diagnostic ignored "-Wunused-parameter"
@@ -22,15 +23,18 @@ public:
 
     void loadConfiguration(Config* cfg);
     void fccLatticeGenerator(Atom **atoms);
-    void setVelocity(Atom **atoms, string distribution);
+    void setVelocity(Atom **atoms);
     int getNLocalResAtoms();
     int getNAtoms();
 
 private:
+    void setInitVelocityDistribution();
     int procID,nProc;
     int Nc, nAtoms, nLocalResAtoms;
+    int initVelocityDist;
     double sigma,Temperator,T_0,latticeConstant, density;
     long idum;
+    string velocityDist;
 };
 
 #endif // GENERATOR_H
