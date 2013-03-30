@@ -65,25 +65,6 @@ void Generator::fccLatticeGenerator(Atom **atoms)
 }
 
 /************************************************************
-Name:           fcc_lattice_creator
-Description:    Creates a FCC lattice
-*/
-int Generator::getNLocalResAtoms()
-{
-    return nLocalResAtoms;
-}
-
-/************************************************************
-Name:           fcc_lattice_creator
-Description:    Creates a FCC lattice
-*/
-int Generator::getNAtoms()
-{
-    return nAtoms;
-}
-
-
-/************************************************************
 Name:           setVelocity
 Description:    Sets initial velocity
 */
@@ -91,9 +72,10 @@ void Generator::setVelocity(Atom **atoms, string distribution)
 {
     vec localSumVelocities = zeros<vec>(3,1);
     vec sumVelocities = zeros<vec>(3,1);
+    idum = idum - procID- time(NULL);
+    srand(-idum);
 
-
-    if(distribution=="uniform"){
+    if(distribution =="uniform"){
         double v=2.0;
         for(int i = 0; i < nLocalResAtoms; i++){
             for(int j=0; j < 3 ; j++){
@@ -114,18 +96,31 @@ void Generator::setVelocity(Atom **atoms, string distribution)
     MPI_Allreduce(&localSumVelocities[0],&sumVelocities[0],3,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
 
     //Removing initial linear momentum
-    rowvec totVelocity = zeros(1,3);
-    for(int i=0;i<nAtoms;i++){
-        totVelocity+= atoms[i]->aVelocity;
-    }
-    totVelocity/=nAtoms;
-
-    for(int i=0;i<nAtoms;i++){
-        atoms[i]->aVelocity-=totVelocity;
-
+    sumVelocities/=nAtoms;
+    for(int i=0; i<nLocalResAtoms; i++){
+        for(int j=0; j<atoms[i]->nDimension; j++){
+            atoms[i]->aVelocity(j) -= sumVelocities(j);
+        }
     }
 }
 
+/************************************************************
+Name:           fcc_lattice_creator
+Description:    Creates a FCC lattice
+*/
+int Generator::getNLocalResAtoms()
+{
+    return nLocalResAtoms;
+}
+
+/************************************************************
+Name:           fcc_lattice_creator
+Description:    Creates a FCC lattice
+*/
+int Generator::getNAtoms()
+{
+    return nAtoms;
+}
 
 /************************************************************
 Name:          loadConfiguration
@@ -136,4 +131,5 @@ void Generator::loadConfiguration(Config* cfg){
     Temperator=cfg->lookup("systemSettings.initTemp");
     T_0=cfg->lookup("conversionFactors.T_0");
     density = cfg->lookup("systemSettings.density");
+    idum = cfg->lookup("initialVelocitySetting.idum");
 }

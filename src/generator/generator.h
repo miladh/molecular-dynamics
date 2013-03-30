@@ -30,6 +30,7 @@ private:
     int procID,nProc;
     int Nc, nAtoms, nLocalResAtoms;
     double sigma,Temperator,T_0,latticeConstant, density;
+    long idum;
 };
 
 #endif // GENERATOR_H

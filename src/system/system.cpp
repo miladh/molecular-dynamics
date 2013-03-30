@@ -14,7 +14,7 @@ System::System(const int &procID, const int &nProc, const int &nLocalResAtoms, c
  * Name:
  * Description:
  ***************************************************************/
-void System::MDrun()
+void System::simulateSystem()
 {
     initilizeParameters();
     setTopology();
@@ -30,6 +30,7 @@ void System::MDrun()
     if(procID==0){
         cout << "-----run integrator-----" << endl;
     }
+
     for (int i=1; i <= stepLimit; i++) {
         state = i-1;
         if(procID==0){
@@ -37,8 +38,9 @@ void System::MDrun()
         }
 
         evaluateSystemProperties();
-        fileManager.writeAtomProperties(i,origo,atoms);
+        fileManager.writeAtomProperties(state,origo,atoms);
         singleStep();
+
 
         for(Modifier* modifier: modifiers){
             modifier->apply();
@@ -47,11 +49,15 @@ void System::MDrun()
 
 
     cpu = MPI_Wtime() - cpu1;
+
     if (procID == 0){
-        fileManager.writeSystemProperties(stepLimit,time,kinEnergy,potEnergy,totEnergy,temperature,pressure);
-        printf("CPU & COMT = %le %le\n",cpu,comt);
+        fileManager.writeSystemProperties(stepLimit,time,kinEnergy,potEnergy,totEnergy,temperature,pressure,displacement);
+        cout << "Elapsed time: "        << cpu  << " s" << endl;
+        cout << "Communication time: "  << comt << " s" << endl;
     }
 }
+
+
 
 /************************************************************
 Name:           computeDynamics
@@ -60,7 +66,6 @@ Description:    Computes the dynamics of the system.
 double System::getTemperature(){
     return temperature[state];
 }
-
 
 
 /************************************************************
@@ -78,28 +83,31 @@ void System::addModifiers(Modifier* modifier){
  ***************************************************************/
 void System::evaluateSystemProperties()
 {
-    double localKinEnergy = 0.0;
-    double localPotEnergy = 0.0;
-    double localPressure  = 0.0;
+    localKinEnergy = 0.0;
+    localPotEnergy = 0.0;
+    localPressure  = 0.0;
+    localDisplacement = 0.0;
 
     for (int i=0; i<nLocalResAtoms; i++) {
-        localKinEnergy  += dot(atoms[i]->aVelocity,atoms[i]->aVelocity);
-        localPotEnergy  += atoms[i]->aPotential;
-        localPressure   += atoms[i]->localPressure;
+        localKinEnergy   += dot(atoms[i]->aVelocity,atoms[i]->aVelocity);
+        localDisplacement+= dot(atoms[i]->aDisplacement, atoms[i]->aDisplacement);
     }
 
     localKinEnergy *= 0.5;
+    localPotEnergy  = force->getPotentialEnergy();
+    localPressure   = force->getPressure();
+
     MPI_Allreduce(&localKinEnergy,&kinEnergy[state],1,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
     MPI_Allreduce(&localPotEnergy,&potEnergy[state],1,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
     MPI_Allreduce(&localPressure, &pressure[state],1,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
+    MPI_Allreduce(&localDisplacement, &displacement[state],1,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
 
     time[state] = state*dt;
-    kinEnergy[state]  /= nAtoms;
-    potEnergy[state]  /= nAtoms;
-    totEnergy[state]   = kinEnergy[state] + potEnergy[state];
-    temperature[state] = kinEnergy[state]*2.0/3.0;
-    pressure[state]    += density*temperature[state];
-    //    pressure[state]   *= 1/(6*volume);
+    displacement[state] /= nAtoms;
+    totEnergy[state]     = kinEnergy[state] + potEnergy[state];
+    temperature[state]   = kinEnergy[state]/nAtoms*2.0/3.0;
+    pressure[state]     *= 1/(3*volume);
+    pressure[state]     += density*temperature[state];
 }
 
 
@@ -150,7 +158,6 @@ void System::setTopology(){
     //Write
     if(procID==0){
         cout << "---------Setting topology-----------" << endl;
-        cout << "Neighbor ID:      " << neigID.t();
         cout << "Processor parity: " << myParity.t();
     }
 
@@ -164,7 +171,7 @@ void System::initilizeParameters(){
 
     procVec     = zeros<ivec>(3,1);
     IDVec       = zeros<ivec>(3,1);
-    systemSize  = zeros<ivec>(3,1); //Px, Py, Pz
+    systemSize  = zeros<ivec>(3,1); //Px, Py, Pz2
     subsysSize  = zeros<vec>(3,1);  //Lx,Ly,Lz
     cellSize    = zeros<vec>(3,1);  //rcx,rcy,rcz
     origo       = zeros<vec>(3,1);
@@ -177,6 +184,8 @@ void System::initilizeParameters(){
     totEnergy   = zeros<vec>(stepLimit,1);
     temperature = zeros<vec>(stepLimit,1);
     pressure    = zeros<vec>(stepLimit,1);
+    displacement = zeros<vec>(stepLimit,1);
+    vdt         = zeros<rowvec>(1,3);
 
 
     // Set system size and number of processors in x,y,z direction
@@ -205,6 +214,8 @@ void System::initilizeParameters(){
         origo(i)       = (double)IDVec(i) * subsysSize(i);
     }
 
+    volume = density*nAtoms;
+
     //Write
     if(procID==0){
         cout << "------Initilizing Parameters--------" << endl;
@@ -212,7 +223,6 @@ void System::initilizeParameters(){
         cout << "Subsystem size: "  << subsysSize.t();
         cout << "Number of cells: " << nLocalCells.t();
         cout << "cellSize:        " << cellSize.t();
-        cout << "origoshift       " << origo.t();
     }
 }
 
@@ -232,13 +242,7 @@ void System::computeAccel()
     int atomIsResident, pairIsNotEvaluated;
 
     // Reset the potential & forces
-    for (int i=0; i < nLocalResAtoms; i++){
-        for (int j=0; j<3; j++){
-            atoms[i]->aAcceleration(j) = 0.0;
-        }
-        atoms[i]->aPotential = 0.0;
-        atoms[i]->localPressure = 0.0;
-    }
+    restForce();
 
     // Make a linked-cell list, lscl
     for (int i=0; i < 3; i++){
@@ -330,6 +334,23 @@ void System::computeAccel()
  * Name:
  * Description:
  ***************************************************************/
+void System::restForce()
+{
+    force->restPotentialEnergy();
+    force->restPressure();
+    for (int i=0; i < nLocalResAtoms; i++){
+        for (int j=0; j<3; j++){
+            atoms[i]->aAcceleration(j) = 0.0;
+        }
+    }
+}
+
+
+
+/***************************************************************
+ * Name:
+ * Description:
+ ***************************************************************/
 void System::halfKick()
 {
     for (int i=0; i < nLocalResAtoms; i++){
@@ -345,7 +366,9 @@ void System::singleStep()
 {
     halfKick(); // First half kick to obtain v(t+Dt/2)
     for (int i=0; i<nLocalResAtoms; i++){ // upadate to r(t+Dt)
-        atoms[i]->aPosition += dt*atoms[i]->aVelocity;
+        vdt = dt*atoms[i]->aVelocity;
+        atoms[i]->aPosition += vdt;
+        atoms[i]->aDisplacement += vdt;
     }
     atomMove();
     atomCopy();

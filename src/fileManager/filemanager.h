@@ -21,7 +21,7 @@ public:
     FileManager(const int &procID, const int &nLocalResAtoms, const int &nProc);
     void loadConfiguration(Config* cfg);
     void writeAtomProperties(const int &state, const vec &origo, Atom **atoms);
-    void writeSystemProperties(int numStates, const vec &t , const vec &Ek, const vec &Ep, vec const &Etot, const vec &T, const vec &P);
+    void writeSystemProperties(int numStates, const vec &t , const vec &Ek, const vec &Ep, vec const &Etot, const vec &T, const vec &P, const vec &D);
     void readDataFromFile();
 private:
     int procID, nLocalResAtoms, nProc, stepLimit;

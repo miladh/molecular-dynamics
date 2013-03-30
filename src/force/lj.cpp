@@ -28,28 +28,27 @@ void LJ::calculateAndApplyForce(Atom *atomI, Atom *atomJ, int atomIsResident, in
         atomI->aAcceleration(2) += fcVal*dRz;
 
         if (atomIsResident){
-            atomI->aPotential += vVal;
+            potEnergy += vVal;
+            pressure  += fcVal*dr2;
 
             atomJ->aAcceleration(0) -= fcVal*dRx;
             atomJ->aAcceleration(1) -= fcVal*dRy;
             atomJ->aAcceleration(2) -= fcVal*dRz;
 
         } else{
-            atomI->aPotential += 0.5*vVal;
+            potEnergy += 0.5*vVal;
+            pressure  += 0.5*fcVal*dr2;
         }
-
-        atomI->localPressure += fcVal*dr2;
-        atomJ->localPressure += fcVal*dr2;
     }
 
 }
+
 
 /***************************************************************
  * Name:            loadConfiguration
  * Description:     Load system variables
  ***************************************************************/
 void LJ::setParameters(Config* cfg){
-
     rCut = cfg->lookup("systemSettings.rCut");
     rCut2 = rCut*rCut;
     rCuti2 = 1.0/rCut2;

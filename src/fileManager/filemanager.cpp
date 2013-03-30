@@ -46,22 +46,20 @@ Name:
 Description:
 */
 void FileManager::writeSystemProperties(int numStates, const vec &t,
-                                        const vec &Ek, const vec &Ep, vec const &Etot, const vec &T,const vec &P){
+                                        const vec &Ek, const vec &Ep, vec const &Etot, const vec &T,const vec &P, const vec &D){
 
     outName << statisticsDir << "/statistics.txt";
     myfile.open (outName.str().c_str());
     myfile << "Time  "  <<"Kinetic " << "  Potential  "
-           <<"  Total Energy  "<<"  Temperature  "<<"  Pressure  "<<endl;
+           <<"  Total Energy  "<<"  Temperature  "<<"  Pressure  "<<"  Displacement  "<<endl;
 
     for(int state=0; state<numStates; state++){
         myfile << t_0*t[state] <<"      "<< epsilon*Ek[state] <<"  "<< epsilon*Ep[state]
            << "     "<< epsilon*Etot[state]<< "     "<<T_0*T[state]
-           << "     "<< pressureFactor*epsilon/pow(sigma,3)*P[state] << endl;
+           << "     "<< pressureFactor*epsilon/pow(sigma,3)*P[state]<<"  "<< pow(sigma,2)*D[state]<< endl;
     }
     myfile.close();
 }
-
-
 
 
 /************************************************************

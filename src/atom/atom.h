@@ -16,8 +16,6 @@ public:
     int nDimension;
     string aType;
     rowvec aPosition,aVelocity, aAcceleration,aDisplacement;
-    double aPotential,localPressure;
-
 };
 
 #endif // ATOM_H

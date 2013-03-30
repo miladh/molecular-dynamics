@@ -5,7 +5,6 @@ Atom::Atom(Config *cfg):
     aPosition(zeros<rowvec>(nDimension)),
     aVelocity(zeros<rowvec>(nDimension)),
     aAcceleration(zeros<rowvec>(nDimension)),
-    aDisplacement(zeros<rowvec>(nDimension)),
-    localPressure(0)
+    aDisplacement(zeros<rowvec>(nDimension))
 {
 }

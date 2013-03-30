@@ -30,4 +30,8 @@ enum modifier {
     noModifier, Andersen, Berendsen
 };
 
+enum velocityDist {
+    uniform, normal
+};
+
 #endif // DEFINES_H

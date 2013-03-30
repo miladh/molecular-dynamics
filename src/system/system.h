@@ -30,7 +30,7 @@ class System
 public:
     System(const int &procID, const int &nProc, const int &nLocalResAtoms, const int &nAtoms, Atom **atoms);
 
-    void MDrun();
+    void simulateSystem();
     void initilizeParameters();
     void loadConfiguration(Config* cfg);
     void setTopology();
@@ -39,18 +39,20 @@ public:
     void singleStep();
     void halfKick();
     void computeAccel() ;
+    void restForce();
     int atomDidMove(rowvec r, int neighborID);
     int atomIsBoundary(rowvec r, int neighborID);
     void evaluateSystemProperties();
     double getTemperature();
     void addModifiers(Modifier* modifier);
 
+
     int procID, nProc, Nc;
     int nLocalResAtoms,nAtoms;
     int nBounAtoms;
     double rCut;
     double cpu,comt;
-    vec time,kinEnergy,potEnergy,totEnergy,temperature,pressure;
+    vec time,kinEnergy,potEnergy,totEnergy,temperature,pressure, displacement;
 
     int cellList[NCLMAX], atomList[NEMAX];
     double dbuf[NDBUF],dbufr[NDBUF];
@@ -76,15 +78,16 @@ public:
 
     double T_0;
     string path;
-
+    double volume;
     int nX,nY,nZ;
 
     int state;
 
     TwoBodyForce* force;
      vector <Modifier*> modifiers;
+     rowvec vdt;
 
-
+     double localKinEnergy, localPotEnergy, localPressure, localDisplacement;
 
 };
 

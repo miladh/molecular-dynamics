@@ -19,9 +19,14 @@ public:
 
     virtual void calculateAndApplyForce(Atom *atomI, Atom *atomJ, int atomIsResident, int pairIsNotEvaluated) = 0;
     virtual void setParameters(Config* cfg)=0;
+    virtual void restPotentialEnergy()=0;
+    virtual double getPotentialEnergy()=0;
+    virtual void restPressure()=0;
+    virtual double getPressure()=0;
 
 protected:
     double rCut;
+    double potEnergy, pressure;
 };
 
 #endif // TWOBODYFORCE_H
