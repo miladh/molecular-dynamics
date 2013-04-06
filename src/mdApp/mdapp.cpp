@@ -2,6 +2,7 @@
 
 #include <src/force/lj.h>
 #include <src/force/noforce.h>
+#include <src/force/constantforce.h>
 #include <src/modifier/berendsenthermostat.h>
 #include <src/modifier/andersenthermostat.h>
 #include <src/fileManager/filemanager.h>
@@ -36,7 +37,7 @@ void MDApp::runMDApp()
         MPI_Allreduce(&nLocalResAtoms, &nAtoms, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
 
         if(procID==0){
-        cout << "-------------Initilize configuration--------------" << endl;
+        cout << "----------------Initilize configuration-------------------" << endl;
         cout << "Number of atoms:       "<< nAtoms << endl;
         }
 
@@ -56,7 +57,7 @@ void MDApp::runMDApp()
         nAtoms = ArGenerator.getNAtoms();
     }
 
-    TwoBodyForce* force = setForceType();
+    Force* force = setForceType();
     force->setParameters(cfg);
 
     System Ar(procID, nProc, nLocalResAtoms, nAtoms ,ArAtoms);
@@ -102,17 +103,42 @@ Pores* MDApp::setPoresShape()
 Name:
 Description:
 */
-TwoBodyForce* MDApp::setForceType()
+Force* MDApp::setForceType()
 {
-    TwoBodyForce* force;
+    if(procID==0){
+        cout << "-----------------Setting Forces------------------" <<endl;
+    }
+
+    Force* force;
     switch (forceType) {
     case noInteraction:
         force = new NoForce();
+        if(procID==0){
+            cout << "No force" <<endl;
+        }
+        break;
+
+    case constant:
+        force = new ConstantForce();
+        if(procID==0){
+            cout << "Constant force" <<endl;
+        }
         break;
 
     case lennardJones:
         force = new LJ();
+        if(procID==0){
+            cout << "Lennard Jones" <<endl;
+        }
         break;
+
+//    case LJ_Constant:
+//         force = new LJ();
+//         force = new ConstantForce();
+//         if(procID==0){
+//             cout << "Lennard Jones+Constant" <<endl;
+//         }
+//         break;
 
     default:
         if(procID==0){

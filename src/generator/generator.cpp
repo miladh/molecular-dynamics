@@ -61,7 +61,7 @@ void Generator::fccLatticeGenerator(Atom **atoms)
 
     //Write
     if(procID==0){
-        cout << "------Initilize configuration-------" << endl;
+        cout << "-------------Initilize configuration--------------" << endl;
         cout << "Number of Local atoms: "<< nLocalResAtoms << endl;
         cout << "Number of atoms:       "<< nAtoms << endl;
     }

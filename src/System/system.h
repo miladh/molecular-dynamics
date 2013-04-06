@@ -33,6 +33,8 @@ public:
     void simulateSystem();
     void initilizeParameters();
     void loadConfiguration(Config* cfg);
+    void addModifiers(Modifier* modifier);
+    void evaluateSystemProperties();
     void setTopology();
     void atomCopy();
     void atomMove();
@@ -40,12 +42,10 @@ public:
     void halfKick();
     void computeAccel() ;
     void restForce();
+    void applyModifier();
+    double getTemperature();
     int atomDidMove(rowvec r, int neighborID);
     int atomIsBoundary(rowvec r, int neighborID);
-    void evaluateSystemProperties();
-    double getTemperature();
-    void addModifiers(Modifier* modifier);
-    void applyModifier();
 
 
     int procID, nProc, Nc;
@@ -84,11 +84,11 @@ public:
 
     int state;
     int loadState;
-    TwoBodyForce* force;
-     vector <Modifier*> modifiers;
-     rowvec vdt;
+    Force* force;
+    vector <Modifier*> modifiers;
+    rowvec vdt;
 
-     double localKinEnergy, localPotEnergy, localPressure, localDisplacement;
+    double localKinEnergy, localPotEnergy, localPressure, localDisplacement;
 
 };
 

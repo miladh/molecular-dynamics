@@ -16,7 +16,9 @@
 #include <src/System/system.h>
 #include <src/atom/atom.h>
 #include <src/generator/generator.h>
+#include <src/force/force.h>
 #include <src/force/twobodyforce.h>
+#include <src/force/onebodyforce.h>
 #include <src/modifier/modifier.h>
 #include <src/pores/pores.h>
 
@@ -39,7 +41,7 @@ private:
     double tau,targetTemperature, T_0;
 
     void setModifierType(System *system);
-    TwoBodyForce* setForceType();
+    Force *setForceType();
     Pores* setPoresShape();
 };
 

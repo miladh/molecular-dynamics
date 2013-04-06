@@ -339,9 +339,7 @@ void System::halfKick()
     for (int i=0; i < nLocalResAtoms; i++){
         if(!atoms[i]->frozen){
             atoms[i]->aVelocity+=dt/2*atoms[i]->aAcceleration;
-        }/*else{
-            atoms[i]->aVelocity = zeros(1,3);
-        }*/
+        }
     }
 }
 

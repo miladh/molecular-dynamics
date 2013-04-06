@@ -23,7 +23,7 @@ EMPTY: Signifies the end of a linked list.
 
 
 enum force {
-   noInteraction, lennardJones
+   noInteraction, constant, lennardJones, LJ_Constant
 };
 
 enum modifier {

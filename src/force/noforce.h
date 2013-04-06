@@ -1,9 +1,9 @@
 #ifndef NOFORCE_H
 #define NOFORCE_H
 
-#include <src/force/twobodyforce.h>
+#include <src/force/onebodyforce.h>
 
-class NoForce : public TwoBodyForce
+class NoForce : public OneBodyForce
 {
 public:
     NoForce();
