@@ -57,11 +57,9 @@ void MDApp::runMDApp()
         nAtoms = ArGenerator.getNAtoms();
     }
 
-    Force* force = setForceType();
-    force->setParameters(cfg);
-
     System Ar(procID, nProc, nLocalResAtoms, nAtoms ,ArAtoms);
-    Ar.force = force;
+
+    setForceType(&Ar);
     setModifierType(&Ar);
     Ar.loadConfiguration(cfg);
     Ar.simulateSystem();
@@ -103,7 +101,7 @@ Pores* MDApp::setPoresShape()
 Name:
 Description:
 */
-Force* MDApp::setForceType()
+void MDApp::setForceType(System *system)
 {
     if(procID==0){
         cout << "-----------------Setting Forces------------------" <<endl;
@@ -120,6 +118,8 @@ Force* MDApp::setForceType()
 
     case constant:
         force = new ConstantForce();
+        force->setParameters(cfg);
+        system->addForces(force);
         if(procID==0){
             cout << "Constant force" <<endl;
         }
@@ -127,27 +127,31 @@ Force* MDApp::setForceType()
 
     case lennardJones:
         force = new LJ();
+        force->setParameters(cfg);
+        system->addForces(force);
         if(procID==0){
             cout << "Lennard Jones" <<endl;
         }
         break;
 
-//    case LJ_Constant:
-//         force = new LJ();
-//         force = new ConstantForce();
-//         if(procID==0){
-//             cout << "Lennard Jones+Constant" <<endl;
-//         }
-//         break;
+    case LJ_Constant:
+         force = new LJ();
+         force->setParameters(cfg);
+         system->addForces(force);
+         force = new ConstantForce();
+         force->setParameters(cfg);
+         system->addForces(force);
+         if(procID==0){
+             cout << "Lennard Jones+Constant" <<endl;
+         }
+         break;
 
     default:
         if(procID==0){
         cerr << "Unknown force type!" << endl;
         }
         exit(0);
-
     }
-    return force;
 }
 
 /************************************************************

@@ -12,8 +12,10 @@ class Modifier;
 #include <src/atom/atom.h>
 #include <src/includes/defines.h>
 #include <src/fileManager/filemanager.h>
+#include <src/force/force.h>
+#include <src/force/onebodyforce.h>
 #include <src/force/twobodyforce.h>
-#include "src/modifier/modifier.h"
+#include <src/modifier/modifier.h>
 
 #pragma GCC diagnostic ignored "-Wunused-parameter"
 #include <mpi.h>
@@ -34,6 +36,7 @@ public:
     void initilizeParameters();
     void loadConfiguration(Config* cfg);
     void addModifiers(Modifier* modifier);
+    void addForces(Force* force);
     void evaluateSystemProperties();
     void setTopology();
     void atomCopy();
@@ -43,52 +46,43 @@ public:
     void computeAccel() ;
     void restForce();
     void applyModifier();
+    void applyForces(int atomI, int atomJ, int atomIsResident, int pairIsNotEvaluated);
     double getTemperature();
     int atomDidMove(rowvec r, int neighborID);
     int atomIsBoundary(rowvec r, int neighborID);
 
+    Config* cfg;
+    Atom** atoms;
+    vector <Force*> forces;
+    vector <Modifier*> modifiers;
 
-    int procID, nProc, Nc;
-    int nLocalResAtoms,nAtoms;
-    int nBounAtoms;
+    int procID, nProc, Nc, nX,nY,nZ;
+    int nLocalResAtoms,nAtoms,nBounAtoms;
     double rCut;
     double cpu,comt;
-    vec time,kinEnergy,potEnergy,totEnergy,temperature,pressure, displacement;
 
     int cellList[NCLMAX], atomList[NEMAX];
     double dbuf[NDBUF],dbufr[NDBUF];
 
     ivec procVec, IDVec, neigID;
-    ivec nLocalCells, myParity;
+    ivec systemSize, nLocalCells, myParity;
     vec cellSize, subsysSize, origo;
+    rowvec vdt;
 
     mat aPosition, aVelocity, aAcceleration;
     mat shiftVec;
     imat boundaryAtomList;
 
-    Config* cfg;
     MPI_Status status;
-
-    Atom** atoms;
-
-    ivec systemSize;   /* Number of unit cells per processor */
-    double density,latticeConstant,sigma;     /* Number density of atoms (in reduced unit) */
-    double dt;      /* Size of a time step (in reduced unit) */
-    int stepLimit;      /* Number of time steps to be simulated */
-    int stepAvg;        /* Reporting interval for statistical data */
-
-    double T_0;
     string path;
-    double volume;
-    int nX,nY,nZ;
 
-    int state;
-    int loadState;
-    Force* force;
-    vector <Modifier*> modifiers;
-    rowvec vdt;
+    vec time,kinEnergy,potEnergy,totEnergy,temperature,pressure, displacement;
 
     double localKinEnergy, localPotEnergy, localPressure, localDisplacement;
+    double density,latticeConstant, sigma, dt, T_0, volume;
+    int stepLimit,stepAvg;
+    int state;
+    int loadState;
 
 };
 

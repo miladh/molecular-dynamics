@@ -41,7 +41,7 @@ private:
     double tau,targetTemperature, T_0;
 
     void setModifierType(System *system);
-    Force *setForceType();
+    void setForceType(System *system);
     Pores* setPoresShape();
 };
 

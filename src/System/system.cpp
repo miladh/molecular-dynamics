@@ -2,11 +2,11 @@
 #include <src/force/lj.h>
 
 System::System(const int &procID, const int &nProc, const int &nLocalResAtoms, const int &nAtoms,Atom** atoms):
+    atoms(atoms),
     procID(procID),
     nProc(nProc),
     nLocalResAtoms(nLocalResAtoms),
-    nAtoms(nAtoms),
-    atoms(atoms)
+    nAtoms(nAtoms)
 {
 }
 
@@ -69,8 +69,13 @@ void System::evaluateSystemProperties()
     }
 
     localKinEnergy *= 0.5;
-    localPotEnergy  = force->getPotentialEnergy();
-    localPressure   = force->getPressure();
+
+
+    for(Force* force: forces){
+        localPotEnergy  += force->getPotentialEnergy();
+        localPressure   += force->getPressure();
+    }
+
 
     MPI_Allreduce(&localKinEnergy,&kinEnergy[state],1,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
     MPI_Allreduce(&localPotEnergy,&potEnergy[state],1,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
@@ -292,7 +297,8 @@ void System::computeAccel()
                                         atomIsResident = (atomJ < nLocalResAtoms);
                                         pairIsNotEvaluated = (atomI < atomJ);
 
-                                        force->calculateAndApplyForce(atoms[atomI], atoms[atomJ],atomIsResident,pairIsNotEvaluated);
+                                        applyForces(atomI, atomJ,atomIsResident,pairIsNotEvaluated);
+
                                     } // Endif not self interaction
 
                                     atomJ = atomList[atomJ];
@@ -317,8 +323,11 @@ void System::computeAccel()
  ***************************************************************/
 void System::restForce()
 {
-    force->restPotentialEnergy();
-    force->restPressure();
+    for(Force* force: forces){
+        force->restPotentialEnergy();
+        force->restPressure();
+    }
+
     for (int i=0; i < nLocalResAtoms; i++){
         for (int j=0; j<3; j++){
             atoms[i]->aAcceleration(j) = 0.0;
@@ -661,6 +670,26 @@ void System::applyModifier(){
 
     for(Modifier* modifier: modifiers){
         modifier->apply();
+    }
+}
+
+
+/************************************************************
+Name:           AddModifiers
+Description:
+*/
+void System::addForces(Force* force){
+    forces.push_back(force);
+}
+
+/************************************************************
+Name:           computeDynamics
+Description:    Computes the dynamics of the system.
+*/
+void System::applyForces(int atomI, int atomJ, int atomIsResident, int pairIsNotEvaluated){
+
+    for(Force* force: forces){
+        force->calculateAndApplyForce(atoms[atomI], atoms[atomJ],atomIsResident,pairIsNotEvaluated);
     }
 }
 
