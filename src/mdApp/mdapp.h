@@ -13,11 +13,12 @@
 #include <libconfig.h++>
 
 #include <src/includes/defines.h>
-#include <src/system/system.h>
+#include <src/System/system.h>
 #include <src/atom/atom.h>
 #include <src/generator/generator.h>
 #include <src/force/twobodyforce.h>
 #include <src/modifier/modifier.h>
+#include <src/pores/pores.h>
 
 
 class MDApp
@@ -31,14 +32,15 @@ private:
     Config* cfg;
     string stateDir;
     stringstream outName;
-    int loadState;
+    int loadState, makePores;
     int procID, nProc;
     int nLocalResAtoms, nAtoms;
-    int modifierType, forceType;
+    int modifierType, forceType, poresShape;
     double tau,targetTemperature, T_0;
 
     void setModifierType(System *system);
     TwoBodyForce* setForceType();
+    Pores* setPoresShape();
 };
 
 #endif // MDAPP_H

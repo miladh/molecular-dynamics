@@ -4,6 +4,9 @@
 #include <src/force/noforce.h>
 #include <src/modifier/berendsenthermostat.h>
 #include <src/modifier/andersenthermostat.h>
+#include <src/fileManager/filemanager.h>
+#include <src/pores/cylindricalpores.h>
+#include <src/pores/circularpores.h>
 
 MDApp::MDApp(const int &procID, const int &nProc):
     procID(procID),
@@ -24,28 +27,74 @@ void MDApp::runMDApp()
     }
 
 
-    if(!loadState){
-        ofstream myfile;
-        outName << stateDir << "state10.xyz";
-        myfile.open(outName.str().c_str());
+    if(loadState){
+        FileManager filemanager(procID,nProc);
+        filemanager.loadConfiguration(cfg);
+        filemanager.readDataFromFile(ArAtoms);
 
-    }else{
-    Generator ArGenerator(procID, nProc);
-    ArGenerator.loadConfiguration(cfg);
-    ArGenerator.fccLatticeGenerator(ArAtoms);
-    ArGenerator.setVelocity(ArAtoms);
+        nLocalResAtoms = filemanager.nLocalResAtoms;
+        MPI_Allreduce(&nLocalResAtoms, &nAtoms, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
 
-    nLocalResAtoms = ArGenerator.getNLocalResAtoms();
-    nAtoms = ArGenerator.getNAtoms();
-}
+        if(procID==0){
+        cout << "-------------Initilize configuration--------------" << endl;
+        cout << "Number of atoms:       "<< nAtoms << endl;
+        }
+
+        if(makePores){
+            Pores* pores = setPoresShape();
+            pores->makePores(ArAtoms);
+        }
+
+    }
+    else{
+        Generator ArGenerator(procID, nProc);
+        ArGenerator.loadConfiguration(cfg);
+        ArGenerator.fccLatticeGenerator(ArAtoms);
+        ArGenerator.setVelocity(ArAtoms);
+
+        nLocalResAtoms = ArGenerator.getNLocalResAtoms();
+        nAtoms = ArGenerator.getNAtoms();
+    }
+
     TwoBodyForce* force = setForceType();
     force->setParameters(cfg);
 
-    System Ar(procID, nProc,  nLocalResAtoms, nAtoms ,ArAtoms);
+    System Ar(procID, nProc, nLocalResAtoms, nAtoms ,ArAtoms);
     Ar.force = force;
     setModifierType(&Ar);
     Ar.loadConfiguration(cfg);
     Ar.simulateSystem();
+}
+
+
+/************************************************************
+Name:
+Description:
+*/
+Pores* MDApp::setPoresShape()
+{
+    switch (poresShape) {
+    case cylindrical:
+        Cylindricalpores *Cylpores;
+        Cylpores = new Cylindricalpores(procID,nProc,nLocalResAtoms);
+        Cylpores->loadConfiguration(cfg);
+        return Cylpores;
+        break;
+
+    case circular:
+        Circularpores *Cirpores;
+        Cirpores = new Circularpores(procID,nProc,nLocalResAtoms);
+        Cirpores->loadConfiguration(cfg);
+        return Cirpores;
+        break;
+
+    default:
+        if(procID==0){
+        cerr << "Unknown pores Shape!" << endl;
+        }
+        exit(0);
+
+    }
 }
 
 
@@ -64,6 +113,13 @@ TwoBodyForce* MDApp::setForceType()
     case lennardJones:
         force = new LJ();
         break;
+
+    default:
+        if(procID==0){
+        cerr << "Unknown force type!" << endl;
+        }
+        exit(0);
+
     }
     return force;
 }
@@ -74,10 +130,14 @@ Description:
 */
 void MDApp::setModifierType(System *system)
 {
+    if(procID==0){
+        cout << "-----------------Setting Modifieres---------------" <<endl;
+    }
+
     switch (modifierType) {
     case noModifier:
         if(procID==0){
-        cout << "No modifiers" <<endl;
+            cout << "No modifiers" <<endl;
         }
         break;
 
@@ -87,6 +147,9 @@ void MDApp::setModifierType(System *system)
         andersenMod->setTargetTemperature(targetTemperature/T_0);
         andersenMod->setCollisionTime(tau);
         system->addModifiers(andersenMod);
+        if(procID==0){
+            cout << " Andersen Thermostat" <<endl;
+        }
         break;
 
     case Berendsen:
@@ -95,6 +158,9 @@ void MDApp::setModifierType(System *system)
         berendsenMod->setTargetTemperature(targetTemperature/T_0);
         berendsenMod->setRelaxationTime(tau);
         system->addModifiers(berendsenMod);
+        if(procID==0){
+            cout << "Berendsen Thermostat" <<endl;
+        }
         break;
     }
 }
@@ -105,13 +171,15 @@ Name:            loadConfiguration
 Description:     Load system variables
 */
 void MDApp::loadConfiguration(Config* cfg){
-    this->cfg=cfg;
-    tau= cfg->lookup("ModifierSettings.tau");
+    this->cfg = cfg;
+    tau = cfg->lookup("ModifierSettings.tau");
     T_0 = cfg->lookup("conversionFactors.T_0");
-    targetTemperature=cfg->lookup("ModifierSettings.targetTemperature");
-    modifierType= cfg->lookup("ModifierSettings.modifierType");
-    forceType= cfg->lookup("forceSettings.forceType");
-    loadState = cfg->lookup("initialStateSettings.loadState");
+    targetTemperature = cfg->lookup("ModifierSettings.targetTemperature");
+    modifierType = cfg->lookup("ModifierSettings.modifierType");
+    forceType = cfg->lookup("forceSettings.forceType");
+    loadState = cfg->lookup("fileManagerSettings.loadState");
+    makePores = cfg->lookup("PoresSetting.makePores");
+    poresShape = cfg->lookup("PoresSetting.poresShape");
     cfg->lookupValue("fileManagerSettings.statesDir",stateDir);
 }
 

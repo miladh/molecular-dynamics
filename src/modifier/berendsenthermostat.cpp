@@ -13,7 +13,9 @@ void BerendsenThermostat::apply()
 
     for(int i=0; i<moleculeSystem->nLocalResAtoms; i++) {
         Atom** atoms= moleculeSystem->atoms;
-        atoms[i]->aVelocity*=gamma;
+        if(!atoms[i]->frozen){
+            atoms[i]->aVelocity*=gamma;
+        }
     }
 }
 

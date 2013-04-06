@@ -12,8 +12,8 @@ using namespace libconfig;
 class Atom
 {
 public:
-    Atom(Config* cfg);
-    int nDimension;
+    Atom(Config*);
+    int nDimension, frozen;
     string aType;
     rowvec aPosition,aVelocity, aAcceleration,aDisplacement;
 };

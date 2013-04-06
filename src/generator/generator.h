@@ -30,7 +30,8 @@ public:
 private:
     void setInitVelocityDistribution();
     int procID,nProc;
-    int Nc, nAtoms, nLocalResAtoms;
+    int Nc,nX, nY, nZ;
+    int nAtoms, nLocalResAtoms;
     int initVelocityDist;
     double sigma,Temperator,T_0,latticeConstant, density;
     long idum;

@@ -18,7 +18,10 @@ void Generator::fccLatticeGenerator(Atom **atoms)
 
     ivec systemSize  = zeros<ivec>(3,1);
     vec subsysSize  = zeros<vec>(3,1);
-    systemSize << Nc << Nc << Nc ;
+
+
+    systemSize << Nc/nX << Nc/nY << Nc/nZ ;
+    density = 4/pow(latticeConstant/sigma,3);
 
     for (int i=0; i < 3; i++){
         subsysSize(i) = (double)systemSize(i) / pow(density/4.0, 1.0/3.0);
@@ -147,9 +150,13 @@ Description:    loadConfiguration
 */
 void Generator::loadConfiguration(Config* cfg){
     Nc = cfg->lookup("systemSettings.Nc");
-    Temperator=cfg->lookup("systemSettings.initTemp");
+    nX = cfg->lookup("systemSettings.nX");
+    nY = cfg->lookup("systemSettings.nY");
+    nZ = cfg->lookup("systemSettings.nZ");
+    latticeConstant = cfg->lookup("systemSettings.latticeConstant");
+    sigma=cfg->lookup("conversionFactors.sigma");
+    Temperator=cfg->lookup("initialVelocitySetting.initTemp");
     T_0=cfg->lookup("conversionFactors.T_0");
-    density = cfg->lookup("systemSettings.density");
     idum = cfg->lookup("initialVelocitySetting.idum");
     initVelocityDist= cfg->lookup("initialVelocitySetting.initVelocityDist");
 }

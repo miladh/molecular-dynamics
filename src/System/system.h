@@ -45,6 +45,7 @@ public:
     void evaluateSystemProperties();
     double getTemperature();
     void addModifiers(Modifier* modifier);
+    void applyModifier();
 
 
     int procID, nProc, Nc;
@@ -71,7 +72,7 @@ public:
     Atom** atoms;
 
     ivec systemSize;   /* Number of unit cells per processor */
-    double density;     /* Number density of atoms (in reduced unit) */
+    double density,latticeConstant,sigma;     /* Number density of atoms (in reduced unit) */
     double dt;      /* Size of a time step (in reduced unit) */
     int stepLimit;      /* Number of time steps to be simulated */
     int stepAvg;        /* Reporting interval for statistical data */
@@ -82,7 +83,7 @@ public:
     int nX,nY,nZ;
 
     int state;
-
+    int loadState;
     TwoBodyForce* force;
      vector <Modifier*> modifiers;
      rowvec vdt;

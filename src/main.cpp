@@ -1,9 +1,5 @@
 #include <iostream>
-#include <stdio.h>
-#include <math.h>
-#include <armadillo>
 #include <libconfig.h++>
-
 #include <src/mdApp/mdapp.h>
 
 #pragma GCC diagnostic ignored "-Wunused-parameter"
@@ -11,24 +7,23 @@
 // Enable warnings again
 #pragma GCC diagnostic warning "-Wunused-parameter"
 
+using namespace std;
+using namespace libconfig;
+
 int main(int argc, char* argv[])
 {
+    Config cfg;
+    if(argc <= 1){
+        cfg.readFile("../md/src/config.cfg");
+    }else{
+        cfg.readFile(argv[1]);
+    }
+
+
     int procID, nProc;
     MPI_Init(NULL,NULL);
-    MPI_Comm_rank(MPI_COMM_WORLD, &procID);
     MPI_Comm_size(MPI_COMM_WORLD, &nProc);
-
-    Config cfg;
-    for(int i=0; i<nProc; i++){
-        if(procID==i){
-            if(argc <= 1){
-                cfg.readFile("../md/src/config.cfg");
-            }else{
-                cfg.readFile(argv[1]);
-            }
-        }
-        MPI_Barrier(MPI_COMM_WORLD);
-    }
+    MPI_Comm_rank(MPI_COMM_WORLD, &procID);
 
     if(procID==0){
         cout << "Starting molecular-dynamics" << endl;
@@ -37,8 +32,23 @@ int main(int argc, char* argv[])
     MDApp mdApp(procID, nProc);
     mdApp.loadConfiguration(&cfg);
     mdApp.runMDApp();
+
     if(procID==0){
         cout << "Molecular-dynamics done!" << endl;
     }
     MPI_Finalize();
+
+    return 0;
 }
+
+
+//    for(int i=0; i<nProc; i++){
+//        if(procID==i){
+//            if(argc <= 1){
+//                cfg.readFile("../md/src/config.cfg");
+//            }else{
+//                cfg.readFile(argv[1]);
+//            }
+//        }
+//        MPI_Barrier(MPI_COMM_WORLD);
+//    }

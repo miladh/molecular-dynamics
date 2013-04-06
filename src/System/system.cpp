@@ -1,4 +1,4 @@
-#include <src/system/system.h>
+#include <src/System/system.h>
 #include <src/force/lj.h>
 
 System::System(const int &procID, const int &nProc, const int &nLocalResAtoms, const int &nAtoms,Atom** atoms):
@@ -21,16 +21,16 @@ void System::simulateSystem()
     atomCopy();
     computeAccel();
 
-    FileManager fileManager(procID, nLocalResAtoms, nProc);
+    FileManager fileManager(procID, nProc);
     fileManager.loadConfiguration(cfg);
 
     double cpu1;
     cpu1 = MPI_Wtime();
 
-    if(procID==0){
-        cout << "-----run integrator-----" << endl;
-    }
 
+    if(procID==0){
+        cout << "-----------------Run integrator-------------------" << endl;
+    }
     for (int i=1; i <= stepLimit; i++) {
         state = i-1;
         if(procID==0){
@@ -38,43 +38,18 @@ void System::simulateSystem()
         }
 
         evaluateSystemProperties();
-        fileManager.writeAtomProperties(state,origo,atoms);
+        fileManager.writeAtomProperties(state, nLocalResAtoms, origo,atoms);
         singleStep();
-
-
-        for(Modifier* modifier: modifiers){
-            modifier->apply();
-        }
+        applyModifier();
     }
 
 
     cpu = MPI_Wtime() - cpu1;
-
     if (procID == 0){
         fileManager.writeSystemProperties(stepLimit,time,kinEnergy,potEnergy,totEnergy,temperature,pressure,displacement);
         cout << "Elapsed time: "        << cpu  << " s" << endl;
         cout << "Communication time: "  << comt << " s" << endl;
     }
-}
-
-
-
-/************************************************************
-Name:           computeDynamics
-Description:    Computes the dynamics of the system.
-*/
-double System::getTemperature(){
-    return temperature[state];
-}
-
-
-/************************************************************
-Name:           AddModifiers
-Description:
-*/
-void System::addModifiers(Modifier* modifier){
-    modifiers.push_back(modifier);
-
 }
 
 /***************************************************************
@@ -157,7 +132,7 @@ void System::setTopology(){
 
     //Write
     if(procID==0){
-        cout << "---------Setting topology-----------" << endl;
+        cout << "-----------------Setting topology------------------" << endl;
         cout << "Processor parity: " << myParity.t();
     }
 
@@ -189,7 +164,7 @@ void System::initilizeParameters(){
 
 
     // Set system size and number of processors in x,y,z direction
-    systemSize << Nc << Nc << Nc ;
+    systemSize << Nc/nX << Nc/nY << Nc/nZ ;
     procVec << nX << nY << nZ;
     if(procVec(0)*procVec(1)*procVec(2)!=nProc){
         cerr << "Number of processors doesn't match!" << endl;
@@ -201,9 +176,10 @@ void System::initilizeParameters(){
     IDVec(1) = (procID / procVec(2)) % procVec(1);
     IDVec(2) = procID % procVec(2);
 
+    density = 4/pow(latticeConstant/sigma,3);
 
     // Compute subsystem size (Lx,Ly,Lz)
-    for (int i=0; i < 3; i++){  //density = N^3 * 4 / (Lx*Ly*Lz)
+    for (int i=0; i < 3; i++){  //density = N^3 * 4 / (Lx*Ly*Lz) (not Nc but N!!)
         subsysSize(i) = (double)systemSize(i) / pow(density/4.0, 1.0/3.0);
     }
 
@@ -214,11 +190,16 @@ void System::initilizeParameters(){
         origo(i)       = (double)IDVec(i) * subsysSize(i);
     }
 
-    volume = density*nAtoms;
+    if(loadState){
+        for(int atom=0;  atom < nLocalResAtoms; atom++){
+            atoms[atom]->aPosition -= origo.t();
+        }
+    }
 
+    volume = nAtoms/density;
     //Write
     if(procID==0){
-        cout << "------Initilizing Parameters--------" << endl;
+        cout << "-------------Initilizing Parameters---------------" << endl;
         cout << "System size: "     << systemSize.t();
         cout << "Subsystem size: "  << subsysSize.t();
         cout << "Number of cells: " << nLocalCells.t();
@@ -306,7 +287,7 @@ void System::computeAccel()
                                 while (atomJ != EMPTY) {
 
                                     // No calculation with itself
-                                    if (atomJ != atomI) {
+                                    if (atomJ != atomI) { //atoms[atomI]->frozen != atoms[atomJ]->frozen
                                         // Check if resident atom
                                         atomIsResident = (atomJ < nLocalResAtoms);
                                         pairIsNotEvaluated = (atomI < atomJ);
@@ -353,8 +334,14 @@ void System::restForce()
  ***************************************************************/
 void System::halfKick()
 {
+    rowvec3 vect;
+    vect << 0 << 0 << 0.1;
     for (int i=0; i < nLocalResAtoms; i++){
-        atoms[i]->aVelocity+=dt/2*atoms[i]->aAcceleration;
+        if(!atoms[i]->frozen){
+            atoms[i]->aVelocity+=dt/2*atoms[i]->aAcceleration;
+        }/*else{
+            atoms[i]->aVelocity = zeros(1,3);
+        }*/
     }
 }
 
@@ -364,16 +351,19 @@ void System::halfKick()
  ***************************************************************/
 void System::singleStep()
 {
-    halfKick(); // First half kick to obtain v(t+Dt/2)
-    for (int i=0; i<nLocalResAtoms; i++){ // upadate to r(t+Dt)
-        vdt = dt*atoms[i]->aVelocity;
-        atoms[i]->aPosition += vdt;
-        atoms[i]->aDisplacement += vdt;
+    halfKick();
+    for (int i=0; i<nLocalResAtoms; i++){
+        if(!atoms[i]->frozen){
+            vdt = dt*atoms[i]->aVelocity;
+            atoms[i]->aPosition += vdt;
+            atoms[i]->aDisplacement += vdt;
+        }
     }
     atomMove();
     atomCopy();
     computeAccel();
-    halfKick(); // Second half kick to obtain v(t+Dt)
+    halfKick();
+
 }
 
 
@@ -383,11 +373,12 @@ void System::singleStep()
  ***************************************************************/
 void System::atomCopy()
 {
-
     int nRecAtoms = 0; // # of "received" boundary atoms
     int neighbor, neighborID;
     int nAtomsToBeSend, nAtomsToBeRecv;
     double com1;
+
+
 
 
     // Main loop over x, y & z directions starts
@@ -408,9 +399,8 @@ void System::atomCopy()
                 }
             }
         }
-
         // Message passing
-        com1=MPI_Wtime(); // To calculate the communication time
+        com1 = MPI_Wtime(); // To calculate the communication time
 
         // Loop over the lower & higher directions
         for (int j=0; j<2; j++) {
@@ -440,11 +430,14 @@ void System::atomCopy()
             // Send & receive information on boundary atoms
 
             // Message buffering
-            for (int atom=1; atom <= nAtomsToBeSend; atom++)
-                for (int k=0; k<3; k++) // Shift the coordinate origin
+            for (int atom=1; atom <= nAtomsToBeSend; atom++){
+                for (int k=0; k<3; k++){ // Shift the coordinate origin
                     dbuf[3*(atom-1) + k] = atoms[boundaryAtomList(neighbor, atom)]->aPosition(k) - shiftVec(neighbor, k);
+                }
+            }
 
-            // Even node: send & recv
+
+            //Even node: send & recv
             if (myParity(i) == 0) {
                 MPI_Send(dbuf,3*nAtomsToBeSend,MPI_DOUBLE,neighborID,20,MPI_COMM_WORLD);
                 MPI_Recv(dbufr,3*nAtomsToBeRecv,MPI_DOUBLE,MPI_ANY_SOURCE,20,MPI_COMM_WORLD,&status);
@@ -500,14 +493,13 @@ void System::atomMove()
     int nAtomsToBeSend, nAtomsToBeRecv;
     double com1;
 
-
     //Main loop over x, y & z directions starts
     for (int i=0; i < 3; i++) {
 
         // Make a moved-atom list
         // Scan all the residents & immigrants to list moved-out atoms
         for (int atom =0; atom < nLocalResAtoms + nImAtoms; atom++) {
-            lowDirNeig = 2*i  ; // Neighbor ID
+            lowDirNeig  = 2*i  ; // Neighbor ID
             highDirNeig = 2*i + 1;
 
             // Register a to-be-copied atom
@@ -515,10 +507,16 @@ void System::atomMove()
                 // Move to the lower direction
                 if(atomDidMove(atoms[atom]->aPosition , lowDirNeig)){
                     moveOutAtomList(lowDirNeig, ++(moveOutAtomList(lowDirNeig,0)))  = atom;
+                    if(atoms[atom]->frozen){
+                        cerr << "Atom is forzen, but has moved! " << endl;
+                    }
                 }
                 // Move to the higher direction
                 else if(atomDidMove(atoms[atom]->aPosition , highDirNeig)){
                     moveOutAtomList(highDirNeig, ++(moveOutAtomList(highDirNeig,0))) = atom;
+                    if(atoms[atom]->frozen){
+                        cerr << "Atom is forzen, but has moved! " << endl;
+                    }
                 }
             }
         }
@@ -549,7 +547,6 @@ void System::atomMove()
             else{
                 nAtomsToBeRecv = nAtomsToBeSend;
             }
-
 
             // Send & receive information on boundary atoms
             //Message buffering
@@ -599,6 +596,7 @@ void System::atomMove()
         comt=comt + MPI_Wtime() - com1;
     } // Endfor x, y & z directions, i
 
+
     // Compress resident arrays including new immigrants
     int ipt = 0;
     for (int i=0; i < nLocalResAtoms + nImAtoms; i++) {
@@ -607,11 +605,13 @@ void System::atomMove()
                 atoms[ipt]->aPosition(j) = atoms[i]->aPosition(j);
                 atoms[ipt]->aVelocity(j) = atoms[i]->aVelocity(j);
             }
+            atoms[ipt]->frozen = atoms[i]->frozen;
             ipt++;
         }
     }
     /* Update the compressed # of resident atoms */
     nLocalResAtoms = ipt;
+
 }
 
 /***************************************************************
@@ -646,6 +646,34 @@ int System::atomIsBoundary(rowvec r, int neighborID)
     }
 }
 
+/************************************************************
+Name:           AddModifiers
+Description:
+*/
+void System::addModifiers(Modifier* modifier){
+    modifiers.push_back(modifier);
+
+}
+
+/************************************************************
+Name:           computeDynamics
+Description:    Computes the dynamics of the system.
+*/
+void System::applyModifier(){
+
+    for(Modifier* modifier: modifiers){
+        modifier->apply();
+    }
+}
+
+/************************************************************
+Name:           computeDynamics
+Description:    Computes the dynamics of the system.
+*/
+double System::getTemperature(){
+    return temperature[state];
+}
+
 
 /***************************************************************
  * Name:            loadConfiguration
@@ -657,12 +685,14 @@ void System::loadConfiguration(Config* cfg){
     nX = cfg->lookup("systemSettings.nX");
     nY = cfg->lookup("systemSettings.nY");
     nZ = cfg->lookup("systemSettings.nZ");
-    density = cfg->lookup("systemSettings.density");
+    latticeConstant = cfg->lookup("systemSettings.latticeConstant");
+    sigma=cfg->lookup("conversionFactors.sigma");
     rCut = cfg->lookup("systemSettings.rCut");
     T_0 =cfg->lookup("conversionFactors.T_0");
     dt = cfg->lookup("statisticsSettings.dt");
     stepLimit = cfg->lookup("statisticsSettings.numStates");
     stepAvg = cfg->lookup("statisticsSettings.stepAvg");
+    loadState = cfg->lookup("fileManagerSettings.loadState");
     cfg->lookupValue("fileManagerSettings.statesDir",path);
 
 }

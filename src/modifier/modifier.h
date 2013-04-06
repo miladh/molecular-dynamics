@@ -3,7 +3,7 @@
 
 
 class System;
-#include <src/system/system.h>
+#include <src/System/system.h>
 
 class Modifier
 {

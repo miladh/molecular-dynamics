@@ -8,8 +8,8 @@ AndersenThermostat::AndersenThermostat(System *system):
 void AndersenThermostat::apply(){
 
     for(int i=0; i<moleculeSystem->nLocalResAtoms; i++) {
-        if(randu() < moleculeSystem->dt / collisionTime) {
-            Atom** atoms= moleculeSystem->atoms;
+        Atom** atoms= moleculeSystem->atoms;
+        if(!atoms[i]->frozen && randu() < moleculeSystem->dt / collisionTime) {
             atoms[i]->aVelocity=randn<rowvec>(atoms[i]->nDimension)*sqrt(targetTemperature);
         }
     }

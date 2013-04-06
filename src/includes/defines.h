@@ -34,4 +34,8 @@ enum velocityDist {
     uniform, normal
 };
 
+enum poresShapes {
+    cylindrical, circular
+};
+
 #endif // DEFINES_H

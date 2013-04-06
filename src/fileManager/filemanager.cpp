@@ -1,37 +1,24 @@
 #include "filemanager.h"
 
-FileManager::FileManager(const int &procID, const int &nLocalResAtoms, const int &nProc):
+FileManager::FileManager(const int &procID, const int &nProc):
     procID(procID),
-    nLocalResAtoms(nLocalResAtoms),
     nProc(nProc),
     stepLimit(stepLimit)
 {
 }
 
+
 /************************************************************
 Name:           writeToFile
 Description:    Writes the states to files
 */
-void FileManager::writeAtomProperties(const int &state, const vec &origo, Atom** atoms){
+void FileManager::writeAtomProperties(const int &state, const int &nLocalResAtoms,const vec &origo, Atom** atoms)
+{
+    outName << statesDir << "s" << state << "p" << procID << ".bin";
+    myfile.open(outName.str().c_str(),ios::binary);
 
-    outName << statesDir << "state" << state << ".bin";
-    myfile.open(outName.str().c_str());
-
-    if(procID==0){
-        myfile << nLocalResAtoms*nProc << endl;
-        myfile << "Argon atoms" << endl;
-    }
-
-
-    for(int node=0; node<nProc ; node++){
-        MPI_Barrier(MPI_COMM_WORLD);
-        if(procID==node){
-            for(int i=0;  i < nLocalResAtoms; i++){
-                atoms[i]->aType="Ar";
-                myfile << atoms[i]->aType <<"  "<<join_rows(atoms[i]->aPosition-origo.t(), atoms[i]->aVelocity);
-            }
-        }
-        MPI_Barrier(MPI_COMM_WORLD);
+    for(int i=0;  i < nLocalResAtoms; i++){
+        myfile << join_rows(atoms[i]->aPosition+origo.t(), atoms[i]->aVelocity);
     }
 
     outName.str( std::string() );
@@ -45,8 +32,37 @@ void FileManager::writeAtomProperties(const int &state, const vec &origo, Atom**
 Name:
 Description:
 */
-void FileManager::writeSystemProperties(int numStates, const vec &t,
-                                        const vec &Ek, const vec &Ep, vec const &Etot, const vec &T,const vec &P, const vec &D){
+void FileManager::readDataFromFile(Atom** atoms)
+{
+    mat data;
+    stringstream file;
+
+    file << rawDataDir << "s99p" << procID << ".bin";
+    data.load( file.str() );
+
+    nLocalResAtoms = data.n_rows;
+
+    for(int p=0; p <nProc; p++ ){
+        if(procID==p){
+            for(int atom=0; atom < nLocalResAtoms; atom++ ){
+                for(int i=0; i < 3; i++){
+                    atoms[atom]->aPosition(i) = data(atom,i);
+                    atoms[atom]->aVelocity(i) = data(atom,3+i);
+                }
+            }
+        }
+        MPI_Barrier(MPI_COMM_WORLD);
+    }
+}
+
+/************************************************************
+Name:
+Description:
+*/
+void FileManager::writeSystemProperties(int numStates, const vec &t, const vec &Ek,
+                                        const vec &Ep, vec const &Etot, const vec &T,
+                                        const vec &P, const vec &D)
+{
 
     outName << statisticsDir << "/statistics.bin";
     myfile.open (outName.str().c_str(),ios::binary);
@@ -55,39 +71,10 @@ void FileManager::writeSystemProperties(int numStates, const vec &t,
 
     for(int state=0; state<numStates; state++){
         myfile << t_0*t[state] <<"      "<< epsilon*Ek[state] <<"  "<< epsilon*Ep[state]
-           << "     "<< epsilon*Etot[state]<< "     "<<T_0*T[state]
-           << "     "<< pressureFactor*epsilon/pow(sigma,3)*P[state]<<"  "<< pow(sigma,2)*D[state]<< endl;
+                  << "     "<< epsilon*Etot[state]<< "     "<<T_0*T[state]
+                     << "     "<< pressureFactor*epsilon/pow(sigma,3)*P[state]<<"  "<< pow(sigma,2)*D[state]<< endl;
     }
     myfile.close();
-}
-
-
-/************************************************************
-Name:
-Description:
-*/
-void FileManager::readDataFromFile()
-{
-    mat data;
-    mat data_i = zeros(nLocalResAtoms,6);
-    // Loading the first file
-    stringstream file;
-
-    int nRows= nLocalResAtoms;
-
-    for(int s=1; s < stepLimit; s++){
-        outName << statesDir <<"../STATES/state" << s << ".xyz";
-        for(int p=0; p < nProc; p++){
-            file.str("");
-            file << statesDir << "s" << s << "p" << p << ".xyz";
-            data_i.load( file.str() );
-            data.insert_rows(p*nRows, data_i);
-        }
-        data.insert_rows(0,nLocalResAtoms*2);
-        data.save(outName.str(),arma_ascii);
-        outName.str( std::string() );
-        outName.clear();
-    }
 }
 
 
@@ -105,5 +92,44 @@ void FileManager::loadConfiguration(Config* cfg){
 
     cfg->lookupValue("fileManagerSettings.statisticsDir",statisticsDir);
     cfg->lookupValue("fileManagerSettings.statesDir",statesDir);
+    cfg->lookupValue("fileManagerSettings.rawDataDir",rawDataDir);
 
 }
+
+
+
+/************************************************************
+    Name:
+    Description:
+    */
+//void FileManager::readDataFromFile(Atom** atoms)
+//{
+//    mat data,data_i;
+//    stringstream file;
+
+//    for(int i=0;  i < nLocalResAtoms; i++){
+//        for(int k=0; k <3 ; k++){
+//            if(atoms[i]->frozen && atoms[i]->aVelocity(k)!=0){
+//                cerr << "Atom not freezed!!  " << "procID: " << procID << endl;
+//            }
+//        }
+//    }
+
+//    file << rawDataDir << "s99p0" << ".bin";
+//    data.load( file.str() );
+//    cout << data.n_rows<<endl;
+//    for(int p=1; p <nProc; p++){
+//        file.str("");
+//        file << rawDataDir << "s99p" << p << ".bin";
+//        data_i.load( file.str() );
+//        data = join_cols(data, data_i);
+//    }
+
+//    nLocalResAtoms = data.n_rows/nProc;
+//    for(int atom=0; atom < nLocalResAtoms; atom++ ){
+//        for(int i=0; i < 3; i++){
+//            atoms[atom]->aPosition(i) = data(atom+procID*nLocalResAtoms,i);
+//            atoms[atom]->aVelocity(i) = data(atom+procID*nLocalResAtoms,3+i);
+//        }
+//    }
+//}
