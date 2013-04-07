@@ -27,7 +27,9 @@ int main(int argc, char* argv[])
 
     if(procID==0){
         cout << "Starting molecular-dynamics" << endl;
+        cout << "Number of processors: " << nProc <<endl;
     }
+
 
     MDApp mdApp(procID, nProc);
     mdApp.loadConfiguration(&cfg);

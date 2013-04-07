@@ -21,6 +21,7 @@
 #include <src/force/onebodyforce.h>
 #include <src/modifier/modifier.h>
 #include <src/pores/pores.h>
+#include <src/changeDensity/changedensity.h>
 
 
 class MDApp
@@ -34,7 +35,7 @@ private:
     Config* cfg;
     string stateDir;
     stringstream outName;
-    int loadState, makePores;
+    int loadState, makePores,changeDensity;
     int procID, nProc;
     int nLocalResAtoms, nAtoms;
     int modifierType, forceType, poresShape;

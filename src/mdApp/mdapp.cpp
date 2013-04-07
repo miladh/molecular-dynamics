@@ -27,24 +27,29 @@ void MDApp::runMDApp()
         ArAtoms[i] = new Atom(cfg);
     }
 
-
-
     if(loadState){
         FileManager filemanager(procID,nProc);
         filemanager.loadConfiguration(cfg);
         filemanager.readDataFromFile(ArAtoms);
 
         nLocalResAtoms = filemanager.nLocalResAtoms;
-        MPI_Allreduce(&nLocalResAtoms, &nAtoms, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
-
-        if(procID==0){
-            cout << "----------------Initilize configuration-------------------" << endl;
-            cout << "Number of atoms:       "<< nAtoms << endl;
-        }
 
         if(makePores){
             Pores* pores = setPoresShape();
             pores->makePores(ArAtoms);
+        }
+
+        if(changeDensity){
+            ChangeDensity reduceDensity(procID, nProc, nLocalResAtoms);
+            reduceDensity.loadConfiguration(cfg);
+            reduceDensity.reduceDensity(ArAtoms);
+            nLocalResAtoms = reduceDensity.getnLocalResAtoms();
+        }
+
+        MPI_Allreduce(&nLocalResAtoms, &nAtoms, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+        if(procID==0){
+            cout << "-------------Initilize configuration--------------" << endl;
+            cout << "Number of atoms:       "<< nAtoms << endl;
         }
 
     }
@@ -59,7 +64,6 @@ void MDApp::runMDApp()
     }
 
     System Ar(procID, nProc, nLocalResAtoms, nAtoms ,ArAtoms);
-
     setForceType(&Ar);
     setModifierType(&Ar);
     Ar.loadConfiguration(cfg);
@@ -211,6 +215,7 @@ void MDApp::loadConfiguration(Config* cfg){
     loadState = cfg->lookup("fileManagerSettings.loadState");
     makePores = cfg->lookup("PoresSetting.makePores");
     poresShape = cfg->lookup("PoresSetting.poresShape");
+    changeDensity = cfg->lookup("densitySettings.changeDensity");
     cfg->lookupValue("fileManagerSettings.statesDir",stateDir);
 }
 

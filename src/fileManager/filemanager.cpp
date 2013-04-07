@@ -18,7 +18,7 @@ void FileManager::writeAtomProperties(const int &state, const int &nLocalResAtom
     myfile.open(outName.str().c_str(),ios::binary);
 
     for(int i=0;  i < nLocalResAtoms; i++){
-        myfile << join_rows(atoms[i]->aPosition+origo.t(), atoms[i]->aVelocity);
+        myfile <<join_rows(atoms[i]->aPosition+origo.t(), atoms[i]->aVelocity);
     }
 
     outName.str( std::string() );
