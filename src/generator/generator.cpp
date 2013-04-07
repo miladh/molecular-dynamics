@@ -74,8 +74,8 @@ Description:    Sets initial velocity
 void Generator::setVelocity(Atom **atoms)
 {
     setInitVelocityDistribution();
-    vec localSumVelocities = zeros<vec>(3,1);
-    vec sumVelocities = zeros<vec>(3,1);
+    rowvec localSumVelocities = zeros(1,3);
+    rowvec sumVelocities = zeros(1,3);
     idum = idum - procID- time(NULL);
     srand(-idum);
 
@@ -92,8 +92,8 @@ void Generator::setVelocity(Atom **atoms)
         for(int i = 0; i < nLocalResAtoms; i++){
             for(int j=0; j < 3 ; j++){
                 atoms[i]->aVelocity(j) = randn()*std;
-                localSumVelocities(j) +=atoms[i]->aVelocity(j);
             }
+            localSumVelocities +=atoms[i]->aVelocity;
         }
     }
 
@@ -101,10 +101,9 @@ void Generator::setVelocity(Atom **atoms)
 
     //Removing initial linear momentum
     sumVelocities/=nAtoms;
+
     for(int i=0; i<nLocalResAtoms; i++){
-        for(int j=0; j<atoms[i]->nDimension; j++){
-            atoms[i]->aVelocity(j) -= sumVelocities(j);
-        }
+            atoms[i]->aVelocity-= sumVelocities;
     }
 }
 
@@ -125,8 +124,6 @@ int Generator::getNAtoms()
 {
     return nAtoms;
 }
-
-
 
 /************************************************************
 Name:

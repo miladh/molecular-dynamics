@@ -28,6 +28,7 @@ void MDApp::runMDApp()
     }
 
 
+
     if(loadState){
         FileManager filemanager(procID,nProc);
         filemanager.loadConfiguration(cfg);
@@ -37,8 +38,8 @@ void MDApp::runMDApp()
         MPI_Allreduce(&nLocalResAtoms, &nAtoms, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
 
         if(procID==0){
-        cout << "----------------Initilize configuration-------------------" << endl;
-        cout << "Number of atoms:       "<< nAtoms << endl;
+            cout << "----------------Initilize configuration-------------------" << endl;
+            cout << "Number of atoms:       "<< nAtoms << endl;
         }
 
         if(makePores){
@@ -89,7 +90,7 @@ Pores* MDApp::setPoresShape()
 
     default:
         if(procID==0){
-        cerr << "Unknown pores Shape!" << endl;
+            cerr << "Unknown pores Shape!" << endl;
         }
         exit(0);
 
@@ -135,20 +136,20 @@ void MDApp::setForceType(System *system)
         break;
 
     case LJ_Constant:
-         force = new LJ();
-         force->setParameters(cfg);
-         system->addForces(force);
-         force = new ConstantForce();
-         force->setParameters(cfg);
-         system->addForces(force);
-         if(procID==0){
-             cout << "Lennard Jones+Constant" <<endl;
-         }
-         break;
+        force = new LJ();
+        force->setParameters(cfg);
+        system->addForces(force);
+        force = new ConstantForce();
+        force->setParameters(cfg);
+        system->addForces(force);
+        if(procID==0){
+            cout << "Lennard Jones+Constant" <<endl;
+        }
+        break;
 
     default:
         if(procID==0){
-        cerr << "Unknown force type!" << endl;
+            cerr << "Unknown force type!" << endl;
         }
         exit(0);
     }

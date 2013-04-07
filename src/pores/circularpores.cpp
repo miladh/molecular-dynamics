@@ -45,19 +45,17 @@ void Circularpores::makePores(Atom** atoms){
 
 
 
-
-
 /***************************************************************
  * Name:            loadConfiguration
  * Description:     Load system variables
  */
 void Circularpores::loadConfiguration(Config* cfg){
-    rMin = cfg->lookup("PoresSetting.rMin");
-    rMax = cfg->lookup("PoresSetting.rMax");
+    rMin = cfg->lookup("PoresSetting.circular.rMin");
+    rMax = cfg->lookup("PoresSetting.circular.rMax");
     sigma = cfg->lookup("conversionFactors.sigma");
     latticeConstant = cfg->lookup("systemSettings.latticeConstant");
     Nc = cfg->lookup("systemSettings.Nc");
-    nPores = cfg->lookup("PoresSetting.nPores");
+    nPores = cfg->lookup("PoresSetting.circular.nPores");
 
     rMin /=sigma;
     rMax /=sigma;

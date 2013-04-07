@@ -12,7 +12,7 @@ ConstantForce::ConstantForce()
 void ConstantForce::calculateAndApplyForce(Atom* atom, Atom *, int, int){
 
     for(int i = dir1 ; i <= dir2; i++){
-        atom->aAcceleration(i) += forceMagnitude;
+        atom->aAcceleration(i) += forceMagnitude*epsilon/sigma;
     }
     potEnergy += 0;
     pressure  += 0;
@@ -24,6 +24,8 @@ void ConstantForce::calculateAndApplyForce(Atom* atom, Atom *, int, int){
  ***************************************************************/
 void ConstantForce::setParameters(Config* cfg){
     forceMagnitude = cfg->lookup("forceSettings.constant.forceMag");
+    sigma=cfg->lookup("conversionFactors.sigma");
+    epsilon= cfg->lookup("conversionFactors.epsilon");
     dir1 = cfg->lookup("forceSettings.constant.dir1");
     dir2 = cfg->lookup("forceSettings.constant.dir2");
 }

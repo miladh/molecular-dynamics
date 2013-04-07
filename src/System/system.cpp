@@ -31,6 +31,7 @@ void System::simulateSystem()
     if(procID==0){
         cout << "-----------------Run integrator-------------------" << endl;
     }
+
     for (int i=1; i <= stepLimit; i++) {
         state = i-1;
         if(procID==0){
@@ -50,44 +51,6 @@ void System::simulateSystem()
         cout << "Elapsed time: "        << cpu  << " s" << endl;
         cout << "Communication time: "  << comt << " s" << endl;
     }
-}
-
-/***************************************************************
- * Name:
- * Description:
- ***************************************************************/
-void System::evaluateSystemProperties()
-{
-    localKinEnergy = 0.0;
-    localPotEnergy = 0.0;
-    localPressure  = 0.0;
-    localDisplacement = 0.0;
-
-    for (int i=0; i<nLocalResAtoms; i++) {
-        localKinEnergy   += dot(atoms[i]->aVelocity,atoms[i]->aVelocity);
-        localDisplacement+= dot(atoms[i]->aDisplacement, atoms[i]->aDisplacement);
-    }
-
-    localKinEnergy *= 0.5;
-
-
-    for(Force* force: forces){
-        localPotEnergy  += force->getPotentialEnergy();
-        localPressure   += force->getPressure();
-    }
-
-
-    MPI_Allreduce(&localKinEnergy,&kinEnergy[state],1,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
-    MPI_Allreduce(&localPotEnergy,&potEnergy[state],1,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
-    MPI_Allreduce(&localPressure, &pressure[state],1,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
-    MPI_Allreduce(&localDisplacement, &displacement[state],1,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
-
-    time[state] = state*dt;
-    displacement[state] /= nAtoms;
-    totEnergy[state]     = kinEnergy[state] + potEnergy[state];
-    temperature[state]   = kinEnergy[state]/nAtoms*2.0/3.0;
-    pressure[state]     *= 1/(3*volume);
-    pressure[state]     += density*temperature[state];
 }
 
 
@@ -378,14 +341,50 @@ void System::singleStep()
  * Name:
  * Description:
  ***************************************************************/
+void System::evaluateSystemProperties()
+{
+    localKinEnergy = 0.0;
+    localPotEnergy = 0.0;
+    localPressure  = 0.0;
+    localDisplacement = 0.0;
+
+    for (int i=0; i<nLocalResAtoms; i++) {
+        if(!atoms[i]->frozen){
+        localKinEnergy   += dot(atoms[i]->aVelocity,atoms[i]->aVelocity);
+        localDisplacement+= dot(atoms[i]->aDisplacement, atoms[i]->aDisplacement);
+        }
+    }
+
+    localKinEnergy *= 0.5;
+
+    for(Force* force: forces){
+        localPotEnergy  += force->getPotentialEnergy();
+        localPressure   += force->getPressure();
+    }
+
+    MPI_Allreduce(&localKinEnergy,&kinEnergy[state],1,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
+    MPI_Allreduce(&localPotEnergy,&potEnergy[state],1,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
+    MPI_Allreduce(&localPressure, &pressure[state],1,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
+    MPI_Allreduce(&localDisplacement, &displacement[state],1,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
+
+    time[state] = state*dt;
+    displacement[state] /= nAtoms;
+    totEnergy[state]     = kinEnergy[state] + potEnergy[state];
+    temperature[state]   = kinEnergy[state]/nAtoms*2.0/3.0;
+    pressure[state]     *= 1/(3*volume);
+    pressure[state]     += density*temperature[state];
+}
+
+/***************************************************************
+ * Name:
+ * Description:
+ ***************************************************************/
 void System::atomCopy()
 {
     int nRecAtoms = 0; // # of "received" boundary atoms
     int neighbor, neighborID;
     int nAtomsToBeSend, nAtomsToBeRecv;
     double com1;
-
-
 
 
     // Main loop over x, y & z directions starts

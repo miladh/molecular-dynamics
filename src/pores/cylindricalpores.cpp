@@ -45,11 +45,10 @@ void Cylindricalpores::makePores(Atom **atoms){
  * Description:     Load system variables
  */
 void Cylindricalpores::loadConfiguration(Config* cfg){
-    radius = cfg->lookup("PoresSetting.radius");
+    radius = cfg->lookup("PoresSetting.cylindrical.radius");
     sigma = cfg->lookup("conversionFactors.sigma");
     latticeConstant = cfg->lookup("systemSettings.latticeConstant");
     Nc = cfg->lookup("systemSettings.Nc");
-
     radius/=sigma;
     latticeConstant/=sigma;
 }

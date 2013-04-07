@@ -18,6 +18,7 @@ public:
 private:
     double forceMagnitude;
     int dir1,dir2;
+    double sigma, epsilon;
 };
 
 #endif // SIMPLEFORCE_H
