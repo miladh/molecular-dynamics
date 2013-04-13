@@ -21,7 +21,6 @@ void ChangeDensity::reduceDensity(Atom** atoms)
         newAtoms[i] = new Atom(cfg);
     }
 
-
     int i=0;
     for(int atom=0; atom < nLocalResAtoms; atom++ ){
         if(!atoms[atom]->frozen && randu() < reductionRatio){
@@ -32,7 +31,6 @@ void ChangeDensity::reduceDensity(Atom** atoms)
            i++;
         }
     }
-
 
     for(int i=0; i<NEMAX; i++) {
         atoms[i] = newAtoms[i];

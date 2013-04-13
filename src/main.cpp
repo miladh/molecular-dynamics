@@ -18,6 +18,7 @@ int main(int argc, char* argv[])
     }else{
         cfg.readFile(argv[1]);
     }
+    int analyzeData = cfg.lookup("analysisSettings.analyzeData");
 
 
     int procID, nProc;
@@ -33,7 +34,13 @@ int main(int argc, char* argv[])
 
     MDApp mdApp(procID, nProc);
     mdApp.loadConfiguration(&cfg);
-    mdApp.runMDApp();
+
+    if (analyzeData){
+       mdApp.analyzeData();
+    }else{
+         mdApp.runMDApp();;
+    }
+
 
     if(procID==0){
         cout << "Molecular-dynamics done!" << endl;
@@ -43,14 +50,3 @@ int main(int argc, char* argv[])
     return 0;
 }
 
-
-//    for(int i=0; i<nProc; i++){
-//        if(procID==i){
-//            if(argc <= 1){
-//                cfg.readFile("../md/src/config.cfg");
-//            }else{
-//                cfg.readFile(argv[1]);
-//            }
-//        }
-//        MPI_Barrier(MPI_COMM_WORLD);
-//    }

@@ -20,6 +20,23 @@ MDApp::MDApp(const int &procID, const int &nProc):
 Name:
 Description:
 */
+void MDApp::analyzeData()
+{
+    if(procID==0){
+        cout << "Starting data analysis" << endl;
+    }
+
+    Analysis analyse(procID, nProc);
+    analyse.loadConfiguration(cfg);
+    analyse.readData();
+    analyse.createBins();
+
+}
+
+/************************************************************
+Name:
+Description:
+*/
 void MDApp::runMDApp()
 {
     Atom **ArAtoms= new Atom*[NEMAX];
@@ -38,13 +55,13 @@ void MDApp::runMDApp()
             Pores* pores = setPoresShape();
             pores->makePores(ArAtoms);
         }
-
         if(changeDensity){
             ChangeDensity reduceDensity(procID, nProc, nLocalResAtoms);
             reduceDensity.loadConfiguration(cfg);
             reduceDensity.reduceDensity(ArAtoms);
             nLocalResAtoms = reduceDensity.getnLocalResAtoms();
         }
+
 
         MPI_Allreduce(&nLocalResAtoms, &nAtoms, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
         if(procID==0){
@@ -68,6 +85,7 @@ void MDApp::runMDApp()
     setModifierType(&Ar);
     Ar.loadConfiguration(cfg);
     Ar.simulateSystem();
+
 }
 
 
@@ -124,7 +142,7 @@ void MDApp::setForceType(System *system)
     case constant:
         force = new ConstantForce();
         force->setParameters(cfg);
-        system->addForces(force);
+        system->add1BForces(force);
         if(procID==0){
             cout << "Constant force" <<endl;
         }
@@ -133,7 +151,7 @@ void MDApp::setForceType(System *system)
     case lennardJones:
         force = new LJ();
         force->setParameters(cfg);
-        system->addForces(force);
+        system->add2BForces(force);
         if(procID==0){
             cout << "Lennard Jones" <<endl;
         }
@@ -142,10 +160,10 @@ void MDApp::setForceType(System *system)
     case LJ_Constant:
         force = new LJ();
         force->setParameters(cfg);
-        system->addForces(force);
+        system->add2BForces(force);
         force = new ConstantForce();
         force->setParameters(cfg);
-        system->addForces(force);
+        system->add1BForces(force);
         if(procID==0){
             cout << "Lennard Jones+Constant" <<endl;
         }

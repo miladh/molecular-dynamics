@@ -12,13 +12,32 @@ FileManager::FileManager(const int &procID, const int &nProc):
 Name:           writeToFile
 Description:    Writes the states to files
 */
+void FileManager::writeAnalysisData(const vec &radius, const vec &numDensity, const vec &velo)
+{
+    outName << statisticsDir << "/analysisData.xyz";
+    myfile.open (outName.str().c_str());
+
+    for(int i=0;  i < nBins; i++){
+        myfile <<radius[i] <<"   " << numDensity[i] << "   " << velo[i] << endl;
+    }
+    myfile.close();
+
+}
+
+
+
+/************************************************************
+Name:           writeToFile
+Description:    Writes the states to files
+*/
 void FileManager::writeAtomProperties(const int &state, const int &nLocalResAtoms,const vec &origo, Atom** atoms)
 {
     outName << statesDir << "s" << state << "p" << procID << ".bin";
     myfile.open(outName.str().c_str(),ios::binary);
 
     for(int i=0;  i < nLocalResAtoms; i++){
-        myfile <<join_rows(atoms[i]->aPosition+origo.t(), atoms[i]->aVelocity);
+        myfile << atoms[i]->frozen <<"  "
+               <<join_rows(atoms[i]->aPosition+origo.t(), atoms[i]->aVelocity);
     }
 
     outName.str( std::string() );
@@ -37,7 +56,7 @@ void FileManager::readDataFromFile(Atom** atoms)
     mat data;
     stringstream file;
 
-    file << rawDataDir << "s99p" << procID << ".bin";
+    file << rawDataDir << "s999p" << procID << ".bin";
     data.load( file.str() );
 
     nLocalResAtoms = data.n_rows;
@@ -45,9 +64,10 @@ void FileManager::readDataFromFile(Atom** atoms)
     for(int p=0; p <nProc; p++ ){
         if(procID==p){
             for(int atom=0; atom < nLocalResAtoms; atom++ ){
+                atoms[atom]->frozen = data(atom,0);
                 for(int i=0; i < 3; i++){
-                    atoms[atom]->aPosition(i) = data(atom,i);
-                    atoms[atom]->aVelocity(i) = data(atom,3+i);
+                    atoms[atom]->aPosition(i) = data(atom,i+1);
+                    atoms[atom]->aVelocity(i) = data(atom,4+i);
                 }
             }
         }
@@ -61,9 +81,8 @@ Description:
 */
 void FileManager::writeSystemProperties(int numStates, const vec &t, const vec &Ek,
                                         const vec &Ep, vec const &Etot, const vec &T,
-                                        const vec &P, const vec &D)
+                                        const vec &P, const vec &D,const vec &meanV )
 {
-
     outName << statisticsDir << "/statistics.bin";
     myfile.open (outName.str().c_str(),ios::binary);
     myfile << "Time  "  <<"Kinetic " << "  Potential  "
@@ -71,8 +90,9 @@ void FileManager::writeSystemProperties(int numStates, const vec &t, const vec &
 
     for(int state=0; state<numStates; state++){
         myfile << t_0*t[state] <<"      "<< epsilon*Ek[state] <<"  "<< epsilon*Ep[state]
-                  << "     "<< epsilon*Etot[state]<< "     "<<T_0*T[state]
-                     << "     "<< pressureFactor*epsilon/pow(sigma,3)*P[state]<<"  "<< pow(sigma,2)*D[state]<< endl;
+               <<"     "<< epsilon*Etot[state]<<"     "<<T_0*T[state]
+               <<"     "<< pressureFactor*epsilon/pow(sigma,3)*P[state]
+               <<"     "<< pow(sigma,2)*D[state] <<"     "<<meanV[state]<< endl;
     }
     myfile.close();
 }
@@ -89,6 +109,7 @@ void FileManager::loadConfiguration(Config* cfg){
     epsilon= cfg->lookup("conversionFactors.epsilon");
     pressureFactor=cfg->lookup("conversionFactors.pressureFactor");
     stepLimit = cfg->lookup("statisticsSettings.numStates");
+    nBins = cfg->lookup("analysisSettings.nBins");
 
     cfg->lookupValue("fileManagerSettings.statisticsDir",statisticsDir);
     cfg->lookupValue("fileManagerSettings.statesDir",statesDir);

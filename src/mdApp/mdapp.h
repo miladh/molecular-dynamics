@@ -12,6 +12,7 @@
 #include <armadillo>
 #include <libconfig.h++>
 
+#include <src/analysis/analysis.h>
 #include <src/includes/defines.h>
 #include <src/System/system.h>
 #include <src/atom/atom.h>
@@ -29,6 +30,7 @@ class MDApp
 public:
     MDApp(const int& procID, const int& nProc);
     void runMDApp();
+    void analyzeData();
     void loadConfiguration(Config* cfg);
 
 private:

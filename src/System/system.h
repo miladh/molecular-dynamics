@@ -36,7 +36,8 @@ public:
     void initilizeParameters();
     void loadConfiguration(Config* cfg);
     void addModifiers(Modifier* modifier);
-    void addForces(Force* force);
+    void add1BForces(Force* force);
+    void add2BForces(Force* force);
     void evaluateSystemProperties();
     void setTopology();
     void atomCopy();
@@ -46,18 +47,22 @@ public:
     void computeAccel() ;
     void restForce();
     void applyModifier();
-    void applyForces(int atomI, int atomJ, int atomIsResident, int pairIsNotEvaluated);
+    void apply1BForces(int atomI);
+    void apply2BForces(int atomI, int atomJ, int atomIsResident, int pairIsNotEvaluated);
     double getTemperature();
     int atomDidMove(rowvec r, int neighborID);
     int atomIsBoundary(rowvec r, int neighborID);
 
     Config* cfg;
     Atom** atoms;
-    vector <Force*> forces;
+    vector <Force*> forces1B;
+    vector <Force*> forces2B;
     vector <Modifier*> modifiers;
 
     int procID, nProc, Nc, nX,nY,nZ;
     int nLocalResAtoms,nAtoms,nBounAtoms;
+    int stepLimit,stepAvg,actingStep,state;
+    int loadState;
     double rCut;
     double cpu,comt;
 
@@ -76,13 +81,11 @@ public:
     MPI_Status status;
     string path;
 
-    vec time,kinEnergy,potEnergy,totEnergy,temperature,pressure, displacement;
+    vec time,kinEnergy,potEnergy,totEnergy,temperature,pressure, displacement,meanVelocity;
 
-    double localKinEnergy, localPotEnergy, localPressure, localDisplacement;
+    double localKinEnergy, localPotEnergy, localPressure, localDisplacement,localMeanVelocity;
     double density,latticeConstant, sigma, dt, T_0, volume;
-    int stepLimit,stepAvg;
-    int state;
-    int loadState;
+
 
 };
 

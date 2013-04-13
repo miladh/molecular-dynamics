@@ -12,10 +12,11 @@ ConstantForce::ConstantForce()
 void ConstantForce::calculateAndApplyForce(Atom* atom, Atom *, int, int){
 
     for(int i = dir1 ; i <= dir2; i++){
-        atom->aAcceleration(i) += forceMagnitude*epsilon/sigma;
+        atom->aAcceleration(i) += forceMagnitude;
     }
     potEnergy += 0;
     pressure  += 0;
+
 }
 
 /***************************************************************

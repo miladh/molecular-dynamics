@@ -20,6 +20,8 @@ EMPTY: Signifies the end of a linked list.
 #define MOVED_OUT -1.0e10
 #define EMPTY -1
 
+#define PI 3.14159265359
+
 
 
 enum force {

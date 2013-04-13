@@ -39,15 +39,22 @@ void System::simulateSystem()
         }
 
         evaluateSystemProperties();
-        fileManager.writeAtomProperties(state, nLocalResAtoms, origo,atoms);
+
+        if(state%stepAvg ==1 || state > 49000){
+            fileManager.writeAtomProperties(state, nLocalResAtoms, origo,atoms);
+        }
         singleStep();
+
+        if(i < actingStep){
         applyModifier();
+        }
     }
 
 
     cpu = MPI_Wtime() - cpu1;
     if (procID == 0){
-        fileManager.writeSystemProperties(stepLimit,time,kinEnergy,potEnergy,totEnergy,temperature,pressure,displacement);
+        fileManager.writeSystemProperties(stepLimit,time,kinEnergy,potEnergy,totEnergy,
+                                          temperature,pressure,displacement,meanVelocity);
         cout << "Elapsed time: "        << cpu  << " s" << endl;
         cout << "Communication time: "  << comt << " s" << endl;
     }
@@ -122,13 +129,15 @@ void System::initilizeParameters(){
     boundaryAtomList = zeros<imat>(6,NBMAX);
 
     time = zeros<vec>(stepLimit,1);
-    kinEnergy   = zeros<vec>(stepLimit,1);
-    potEnergy   = zeros<vec>(stepLimit,1);
-    totEnergy   = zeros<vec>(stepLimit,1);
-    temperature = zeros<vec>(stepLimit,1);
-    pressure    = zeros<vec>(stepLimit,1);
+    kinEnergy    = zeros<vec>(stepLimit,1);
+    potEnergy    = zeros<vec>(stepLimit,1);
+    totEnergy    = zeros<vec>(stepLimit,1);
+    temperature  = zeros<vec>(stepLimit,1);
+    pressure     = zeros<vec>(stepLimit,1);
     displacement = zeros<vec>(stepLimit,1);
-    vdt         = zeros<rowvec>(1,3);
+    meanVelocity = zeros<vec>(stepLimit,1);
+
+    vdt          = zeros<rowvec>(1,3);
 
 
     // Set system size and number of processors in x,y,z direction
@@ -260,7 +269,7 @@ void System::computeAccel()
                                         atomIsResident = (atomJ < nLocalResAtoms);
                                         pairIsNotEvaluated = (atomI < atomJ);
 
-                                        applyForces(atomI, atomJ,atomIsResident,pairIsNotEvaluated);
+                                        apply2BForces(atomI, atomJ,atomIsResident,pairIsNotEvaluated);
 
                                     } // Endif not self interaction
 
@@ -286,7 +295,7 @@ void System::computeAccel()
  ***************************************************************/
 void System::restForce()
 {
-    for(Force* force: forces){
+    for(Force* force: forces2B){
         force->restPotentialEnergy();
         force->restPressure();
     }
@@ -305,7 +314,14 @@ void System::restForce()
  * Description:
  ***************************************************************/
 void System::halfKick()
-{
+{    
+    // Calculate onebody forces-------------------------------
+    for(int atom = 0; atom <nLocalResAtoms+nBounAtoms; atom++){
+        if(!atoms[atom]->frozen){
+        apply1BForces(atom);
+        }
+    }
+
     rowvec3 vect;
     vect << 0 << 0 << 0.1;
     for (int i=0; i < nLocalResAtoms; i++){
@@ -347,17 +363,21 @@ void System::evaluateSystemProperties()
     localPotEnergy = 0.0;
     localPressure  = 0.0;
     localDisplacement = 0.0;
+    localMeanVelocity =0.0;
+
 
     for (int i=0; i<nLocalResAtoms; i++) {
         if(!atoms[i]->frozen){
         localKinEnergy   += dot(atoms[i]->aVelocity,atoms[i]->aVelocity);
+        localMeanVelocity     += atoms[i]->aVelocity(2);
         localDisplacement+= dot(atoms[i]->aDisplacement, atoms[i]->aDisplacement);
+
         }
     }
 
     localKinEnergy *= 0.5;
 
-    for(Force* force: forces){
+    for(Force* force: forces2B){
         localPotEnergy  += force->getPotentialEnergy();
         localPressure   += force->getPressure();
     }
@@ -366,9 +386,11 @@ void System::evaluateSystemProperties()
     MPI_Allreduce(&localPotEnergy,&potEnergy[state],1,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
     MPI_Allreduce(&localPressure, &pressure[state],1,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
     MPI_Allreduce(&localDisplacement, &displacement[state],1,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
+    MPI_Allreduce(&localMeanVelocity, &meanVelocity[state],1,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
 
     time[state] = state*dt;
     displacement[state] /= nAtoms;
+    meanVelocity[state] /=nAtoms;
     totEnergy[state]     = kinEnergy[state] + potEnergy[state];
     temperature[state]   = kinEnergy[state]/nAtoms*2.0/3.0;
     pressure[state]     *= 1/(3*volume);
@@ -677,21 +699,40 @@ void System::applyModifier(){
 Name:           AddModifiers
 Description:
 */
-void System::addForces(Force* force){
-    forces.push_back(force);
+void System::add1BForces(Force* force){
+    forces1B.push_back(force);
+}
+
+/************************************************************
+Name:           AddModifiers
+Description:
+*/
+void System::add2BForces(Force* force){
+    forces2B.push_back(force);
 }
 
 /************************************************************
 Name:           computeDynamics
 Description:    Computes the dynamics of the system.
 */
-void System::applyForces(int atomI, int atomJ, int atomIsResident, int pairIsNotEvaluated){
-
-    for(Force* force: forces){
-        force->calculateAndApplyForce(atoms[atomI], atoms[atomJ],atomIsResident,pairIsNotEvaluated);
+void System::apply1BForces(int atomI)
+{
+    for(Force* force: forces1B){
+        force->calculateAndApplyForce(atoms[atomI],0,0,0);
     }
 }
 
+
+/************************************************************
+Name:           computeDynamics
+Description:    Computes the dynamics of the system.
+*/
+void System::apply2BForces(int atomI, int atomJ, int atomIsResident, int pairIsNotEvaluated){
+
+    for(Force* force: forces2B){
+        force->calculateAndApplyForce(atoms[atomI], atoms[atomJ],atomIsResident,pairIsNotEvaluated);
+    }
+}
 /************************************************************
 Name:           computeDynamics
 Description:    Computes the dynamics of the system.
@@ -719,6 +760,7 @@ void System::loadConfiguration(Config* cfg){
     stepLimit = cfg->lookup("statisticsSettings.numStates");
     stepAvg = cfg->lookup("statisticsSettings.stepAvg");
     loadState = cfg->lookup("fileManagerSettings.loadState");
+    actingStep = cfg->lookup("ModifierSettings.actingStep");
     cfg->lookupValue("fileManagerSettings.statesDir",path);
 
 }
