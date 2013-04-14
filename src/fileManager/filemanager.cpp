@@ -56,7 +56,7 @@ void FileManager::readDataFromFile(Atom** atoms)
     mat data;
     stringstream file;
 
-    file << rawDataDir << "s999p" << procID << ".bin";
+    file << rawDataDir << "s499p" << procID << ".bin";
     data.load( file.str() );
 
     nLocalResAtoms = data.n_rows;

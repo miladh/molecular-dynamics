@@ -40,7 +40,7 @@ void System::simulateSystem()
 
         evaluateSystemProperties();
 
-        if(state%stepAvg ==1 || state > 49000){
+        if(state%stepAvg == 1 || state > 1000){
             fileManager.writeAtomProperties(state, nLocalResAtoms, origo,atoms);
         }
         singleStep();
@@ -459,33 +459,35 @@ void System::atomCopy()
 
             // Message buffering
             for (int atom=1; atom <= nAtomsToBeSend; atom++){
+                dbuf[4*(atom-1)] = atoms[boundaryAtomList(neighbor, atom)]->frozen;
                 for (int k=0; k<3; k++){ // Shift the coordinate origin
-                    dbuf[3*(atom-1) + k] = atoms[boundaryAtomList(neighbor, atom)]->aPosition(k) - shiftVec(neighbor, k);
+                    dbuf[4*(atom-1) + k+1] = atoms[boundaryAtomList(neighbor, atom)]->aPosition(k) - shiftVec(neighbor, k);
                 }
             }
 
 
             //Even node: send & recv
             if (myParity(i) == 0) {
-                MPI_Send(dbuf,3*nAtomsToBeSend,MPI_DOUBLE,neighborID,20,MPI_COMM_WORLD);
-                MPI_Recv(dbufr,3*nAtomsToBeRecv,MPI_DOUBLE,MPI_ANY_SOURCE,20,MPI_COMM_WORLD,&status);
+                MPI_Send(dbuf,4*nAtomsToBeSend,MPI_DOUBLE,neighborID,20,MPI_COMM_WORLD);
+                MPI_Recv(dbufr,4*nAtomsToBeRecv,MPI_DOUBLE,MPI_ANY_SOURCE,20,MPI_COMM_WORLD,&status);
             }
             // Odd node: recv & send
             else if (myParity(i) == 1) {
-                MPI_Recv(dbufr,3*nAtomsToBeRecv,MPI_DOUBLE,MPI_ANY_SOURCE,20,MPI_COMM_WORLD,&status);
-                MPI_Send(dbuf, 3*nAtomsToBeSend,MPI_DOUBLE,neighborID,20,MPI_COMM_WORLD);
+                MPI_Recv(dbufr,4*nAtomsToBeRecv,MPI_DOUBLE,MPI_ANY_SOURCE,20,MPI_COMM_WORLD,&status);
+                MPI_Send(dbuf, 4*nAtomsToBeSend,MPI_DOUBLE,neighborID,20,MPI_COMM_WORLD);
             }
             // Single layer: Exchange information with myself
             else{
-                for (int atom=0; atom < 3*nAtomsToBeRecv; atom++){
+                for (int atom=0; atom < 4*nAtomsToBeRecv; atom++){
                     dbufr[atom] = dbuf[atom];
                 }
             }
 
             // Message storing
             for (int atom=0; atom < nAtomsToBeRecv; atom++){
+                atoms[nLocalResAtoms + nRecAtoms + atom]->frozen =  dbufr[4*atom];
                 for (int k=0; k<3; k++){
-                    atoms[nLocalResAtoms + nRecAtoms + atom]->aPosition(k) = dbufr[3*atom+k];
+                    atoms[nLocalResAtoms + nRecAtoms + atom]->aPosition(k) = dbufr[4*atom+k+1];
                 }
             }
 
@@ -579,9 +581,10 @@ void System::atomMove()
             // Send & receive information on boundary atoms
             //Message buffering
             for (int atom=1; atom <= nAtomsToBeSend; atom++){
+                dbuf[7*(atom-1)] = atoms[moveOutAtomList(neighbor ,atom)]->frozen;
                 for (int k=0; k<3; k++) {
-                    dbuf[6*(atom-1) + k] = atoms[moveOutAtomList(neighbor ,atom)]->aPosition(k) - shiftVec(neighbor ,k);
-                    dbuf[6*(atom-1)+3+k] = atoms[moveOutAtomList(neighbor ,atom)]->aVelocity(k);
+                    dbuf[7*(atom-1) + k+1] = atoms[moveOutAtomList(neighbor ,atom)]->aPosition(k) - shiftVec(neighbor ,k);
+                    dbuf[7*(atom-1) + k+3+1] = atoms[moveOutAtomList(neighbor ,atom)]->aVelocity(k);
                     atoms[moveOutAtomList(neighbor ,atom)]->aPosition(0) = MOVED_OUT;
 
                     // Mark the moved-out atom
@@ -590,26 +593,27 @@ void System::atomMove()
 
             // Even node: send & recv, if not empty
             if (myParity(i) == 0) {
-                MPI_Send(dbuf,6*nAtomsToBeSend,MPI_DOUBLE,neighborID,120,MPI_COMM_WORLD);
-                MPI_Recv(dbufr,6*nAtomsToBeRecv,MPI_DOUBLE,MPI_ANY_SOURCE,120,MPI_COMM_WORLD,&status);
+                MPI_Send(dbuf,7*nAtomsToBeSend,MPI_DOUBLE,neighborID,120,MPI_COMM_WORLD);
+                MPI_Recv(dbufr,7*nAtomsToBeRecv,MPI_DOUBLE,MPI_ANY_SOURCE,120,MPI_COMM_WORLD,&status);
             }
             // Odd node: recv & send, if not empty
             else if (myParity(i) == 1) {
-                MPI_Recv(dbufr,6*nAtomsToBeRecv,MPI_DOUBLE,MPI_ANY_SOURCE,120, MPI_COMM_WORLD,&status);
-                MPI_Send(dbuf,6*nAtomsToBeSend,MPI_DOUBLE,neighborID,120,MPI_COMM_WORLD);
+                MPI_Recv(dbufr,7*nAtomsToBeRecv,MPI_DOUBLE,MPI_ANY_SOURCE,120, MPI_COMM_WORLD,&status);
+                MPI_Send(dbuf,7*nAtomsToBeSend,MPI_DOUBLE,neighborID,120,MPI_COMM_WORLD);
             }
             // Single layer: Exchange information with myself
             else{
-                for (int atom=0; atom < 6*nAtomsToBeRecv; atom++){
+                for (int atom=0; atom < 7*nAtomsToBeRecv; atom++){
                     dbufr[atom] = dbuf[atom];
                 }
             }
 
             // Message storing
             for (int atom=0; atom < nAtomsToBeRecv; atom++){
+                atoms[nLocalResAtoms + nImAtoms + atom]->frozen = dbufr[7*atom];
                 for (int k=0; k<3; k++) {
-                    atoms[nLocalResAtoms + nImAtoms + atom]->aPosition(k) = dbufr[6*atom  + k];
-                    atoms[nLocalResAtoms + nImAtoms + atom]->aVelocity(k) = dbufr[6*atom+3+ k];
+                    atoms[nLocalResAtoms + nImAtoms + atom]->aPosition(k) = dbufr[7*atom  + k+1];
+                    atoms[nLocalResAtoms + nImAtoms + atom]->aVelocity(k) = dbufr[7*atom  + k+1+3];
                 }
             }
 
