@@ -16,22 +16,6 @@ MDApp::MDApp(const int &procID, const int &nProc):
 }
 
 
-/************************************************************
-Name:
-Description:
-*/
-void MDApp::analyzeData()
-{
-    if(procID==0){
-        cout << "Starting data analysis" << endl;
-    }
-
-    Analysis analyse(procID, nProc);
-    analyse.loadConfiguration(cfg);
-    analyse.readData();
-    analyse.createBins();
-
-}
 
 /************************************************************
 Name:

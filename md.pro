@@ -37,8 +37,7 @@ SOURCES += src/main.cpp \
     src/force/onebodyforce.cpp \
     src/force/constantforce.cpp \
     src/force/force.cpp \
-    src/changeDensity/changedensity.cpp \
-    src/analysis/analysis.cpp
+    src/changeDensity/changedensity.cpp
 
 HEADERS += \
     src/includes/defines.h \
@@ -59,8 +58,7 @@ HEADERS += \
     src/force/onebodyforce.h \
     src/force/constantforce.h \
     src/force/force.h \
-    src/changeDensity/changedensity.h \
-    src/analysis/analysis.h
+    src/changeDensity/changedensity.h
 
 
 

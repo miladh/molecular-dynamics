@@ -18,8 +18,6 @@ int main(int argc, char* argv[])
     }else{
         cfg.readFile(argv[1]);
     }
-    int analyzeData = cfg.lookup("analysisSettings.analyzeData");
-
 
     int procID, nProc;
     MPI_Init(NULL,NULL);
@@ -34,12 +32,7 @@ int main(int argc, char* argv[])
 
     MDApp mdApp(procID, nProc);
     mdApp.loadConfiguration(&cfg);
-
-    if (analyzeData){
-       mdApp.analyzeData();
-    }else{
-         mdApp.runMDApp();;
-    }
+    mdApp.runMDApp();
 
 
     if(procID==0){
